@@ -2,54 +2,102 @@
 // Module Name:     Shift Register
 // Engineer:        Joseph Bellahcen <josbella@iu.edu>
 // Target Devices:  Xilinx Artix-7
-// Description:     Serial-in, parallel-out, serial-out shift register
+// Description:     Universal 8-bit shift register
+//                  Optional tri-state output
 //
 // Notes:           Maximum frequency: 40 MHz
 ///////////////////////////////////////////////////////////////////////////////
 
 module shift_register
-    #(parameter WORD_SIZE = 8)
     (
         // FPGA interface
-        input i_clk,                        // Data is shifted into internal input register on FPGA clock
-        input i_rst_n,                      // Clears contents of internal input register ONLY. Active low
+        input i_clk,
+        input i_rst_n,
 
-        // IO controls
-        input i_output_enable_n,            // Releases contents of internal latch. Active low
-        input i_latch,                      // Transfers contents of internal input register to internal latch
+        // Control interface
+        // ┌───────┬────┬────┬────────────────────┐
+        // │ RESET │ S0 │ S1 │      Behavior      │
+        // ├───────┼────┼────┼────────────────────┤
+        // │ L     │ X  │ X  │ Asynchronous reset │
+        // │ H     │ H  │ H  │ Parallel load      │
+        // │ H     │ L  │ H  │ Left shift         │
+        // │ H     │ H  │ L  │ Right shift        │
+        // │ H     │ L  │ L  │ Hold               │
+        // └───────┴────┴────┴────────────────────┘
+        input i_s0,
+        input i_s1,
 
-        // IO
-        input i_serial_in,                              // Serial data in. Read on the rising edge of every clock cycle
-        output reg [WORD_SIZE-1:0] o_parallel_out,      // Parallel data out shows contents of internal latch if output enable low
-        output reg o_serial_out                         // Serial data out. Updated on the rising edge of every clock cycle
+        // Tri-state output enable
+        // ┌─────┬─────┬─────────────────────────────┐
+        // │ OE0 │ OE1 │         Behavior            │
+        // ├─────┼─────┼─────────────────────────────┤
+        // │ H   │ X   │ High-impedance off state    │
+        // │ L   │ X   │ Low off state               │
+        // │ X   │ H   │ Output disabled             │
+        // │ X   │ L   │ Output enabled              │
+        // └─────┴─────┴─────────────────────────────┘
+        input i_oe0,
+        input i_oe1,
+
+        // IO interface
+        input [7:0]         i_parallel,
+        input               i_serial,
+        output reg [7:0]    o_parallel,
+        output reg          o_serial
     );
 
-    reg [WORD_SIZE-1:0] r_input;
-    reg [WORD_SIZE-1:0] r_latch;
+    reg [7:0] r_data;
+    reg       r_overflow;
 
-    // Serial IO
-    always @(posedge i_clk) begin
-        if (!i_rst_n) begin
-            r_input <= 'b0;
-            o_serial_out <= 0;
+    // Input
+    always @(posedge i_clk or negedge i_rst_n) begin
+        if (~i_rst_n) begin
+            r_data <= 'b0;
+            r_overflow <= 'b0;
         end
 
         else begin
-            r_input <= {i_serial_in, r_input[WORD_SIZE-1:1]};
-            o_serial_out <= r_input[0];
+            case ({i_s0, i_s1})
+                'b00: begin
+                    r_data <= r_data;
+                    r_overflow <= r_overflow;
+                end
+
+                'b01: begin
+                    r_data <= {r_data[6:0], i_serial};
+                    r_overflow <= r_data[7];
+                end
+
+                'b10: begin
+                    r_data <= {i_serial, r_data[7:1]};
+                    r_overflow <= r_data[0];
+                end
+
+                'b11: begin
+                    r_data <= i_parallel;
+                    r_overflow <= 'b0;
+                end
+            endcase
         end
     end
 
-    // Parallel out (not affected by reset)
-    always @(posedge i_clk) begin
-        if (i_latch)
-            r_latch <= r_input;
-    end
+    // Output
+    always @(*) begin
+        if (~i_rst_n) begin
+            o_parallel = 'b0;
+            o_serial = 'b0;
+        end
 
-    // Asynchronous output enable
-    always @(*)
-        if (i_output_enable_n)
-            o_parallel_out <= 'bz;
-        else
-            o_parallel_out <= r_latch;
+        // Output enabled
+        else if (~i_oe1) begin
+            o_parallel = r_data;
+            o_serial = r_overflow;
+        end
+
+        // Output disabled
+        else begin
+            o_parallel = i_oe0 ? 'bz : 'b0;
+            o_serial = i_oe0   ? 'bz : 'b0;
+        end
+    end
 endmodule
