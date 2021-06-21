@@ -14,7 +14,7 @@ module clock_divider
         input i_rst_n,          // Active low reset
 
         input [31:0] i_div,     // Number of FPGA clock cycles per clock slock
-        output reg o_clk,       // Slow clock
+        output reg o_clk        // Slow clock
     );
 
     reg [31:0] r_div;
