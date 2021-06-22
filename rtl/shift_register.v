@@ -1,3 +1,4 @@
+`timescale 1ns / 1ps
 ///////////////////////////////////////////////////////////////////////////////
 // Module Name:     Shift Register
 // Engineer:        Joseph Bellahcen <josbella@iu.edu>

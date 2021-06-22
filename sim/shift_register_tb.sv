@@ -1,4 +1,4 @@
-`timescale 1ns/1ps
+`timescale 1ns / 1ps
 
 module shift_register_tb;
     logic i_clk;
@@ -26,8 +26,8 @@ module shift_register_tb;
         .o_serial
     );
 
-    // 100 MHz clock
-    always #5 i_clk = ~i_clk;
+    // 40 MHz clock
+    always #12.5 i_clk = ~i_clk;
 
     initial begin
         $dumpfile("shift_register.vcd");
@@ -56,13 +56,13 @@ module shift_register_tb;
         $display("Testing right shift");
         i_oe0 = 0;
         i_oe1 = 0;
-        test_shift_right($random);
+        test_shift_right;
 
         test_reset;
         $display("Testing left shift");
         i_oe0 = 0;
         i_oe1 = 0;
-        test_shift_left($random);
+        test_shift_left;
 
         $display("Testing output modes (check waveform)");
         i_s0 = 0;
