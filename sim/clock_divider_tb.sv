@@ -18,7 +18,7 @@ module clock_divider_tb;
     );
 
     // 100 MHz clock
-    always #10 i_clk = ~i_clk;
+    always #5 i_clk = ~i_clk;
 
     // Waveform generation
     initial begin
@@ -76,7 +76,7 @@ module clock_divider_tb;
 
     task test_clock;
         input [7:0] divisor;
-        $display("Running clock at %f MHz", 25.0/divisor);
+        $display("Running clock at %f MHz", 100.0/divisor);
 
         // Wait until ready
         if (~o_idle)
@@ -91,12 +91,12 @@ module clock_divider_tb;
         repeat((divisor * 8))
             @(negedge i_clk)
                 assert(~o_idle) else
-                    $fatal(1, "Failed to run clock at %f MHz (early exit)", 25.0/divisor);
+                    $fatal(1, "Failed to run clock at %f MHz (early exit)", 100.0/divisor);
 
         repeat (5) @(negedge i_clk);
         
         assert(o_idle && ~o_clk) else
-            $fatal(1, "Failed to run clock at %f MHz (late exit)", 25.0/divisor);
+            $fatal(1, "Failed to run clock at %f MHz (late exit)", 100.0/divisor);
     endtask
 
     task configure;
