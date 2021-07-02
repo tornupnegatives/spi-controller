@@ -8,7 +8,10 @@
 // Author:          Joseph Bellahcen <tornupnegatives@gmail.com>
 //
 // Notes:           Generates 8 slow clock pulses before entering IDLE state
+//                  Max f_input = 50 MHz
+//
 //                  f_output = f_input / divisor
+//
 //                  The divisor should be an even number
 //                  A divisor of 0 will result in a half-speed clock
 ///////////////////////////////////////////////////////////////////////////////
@@ -41,7 +44,7 @@ module clock_divider
     reg [1:0] r_state;
     reg [1:0] r_next_state;
 
-    reg [7:0]  r_config;
+    //reg [7:0]  r_config;
     reg [7:0]  r_cdiv;
 
     reg [7:0] r_fast_cycle;
@@ -55,7 +58,11 @@ module clock_divider
 
         else if (r_state == IDLE) begin
             if (i_config[0]) begin
-                r_config <= i_config[9:1];
+                if (i_config[8:1] != 0)
+                    r_cdiv = (i_config[8:1] >> 1) - 1;
+                else 
+                    r_cdiv = 0;
+                    
                 r_state <= CONFIG;
             end
 
@@ -69,7 +76,7 @@ module clock_divider
     end
 
     // Counter
-    always @(posedge i_clk or negedge i_rst_n) begin
+    always @(posedge i_clk) begin
         if (r_state == RUN) begin
             if (r_fast_cycle != r_cdiv)
                 r_fast_cycle <= r_fast_cycle + 1;
@@ -92,7 +99,6 @@ module clock_divider
         // Defaults
         o_idle = 1;
         o_clk = 0;
-        //r_cdiv = 1;
         r_next_state = r_state;
 
         case(r_state)
@@ -102,11 +108,6 @@ module clock_divider
             CONFIG: begin
                 o_idle = 0;
                 o_clk = 0;
-
-                if (r_config[7:0] != 0)
-                    r_cdiv = (r_config[7:0] / 2) - 1;
-                else 
-                    r_cdiv = 0;
 
                 r_next_state = IDLE;
             end
@@ -120,7 +121,8 @@ module clock_divider
                     o_clk = r_clk;
             end
         endcase
-    end
 
-    assign o_clk_n = ~o_clk;
+        // Inverted clock
+        o_clk_n = ~o_clk;
+    end
 endmodule
