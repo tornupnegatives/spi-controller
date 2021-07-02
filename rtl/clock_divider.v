@@ -49,6 +49,8 @@ module clock_divider
 
     reg [7:0] r_fast_cycle;
     reg [7:0] r_slow_cycle;
+    reg [7:0] r_next_fast;
+    reg [7:0] r_next_slow;
     reg r_clk;
 
     // State machine logic
@@ -59,9 +61,9 @@ module clock_divider
         else if (r_state == IDLE) begin
             if (i_config[0]) begin
                 if (i_config[8:1] != 0)
-                    r_cdiv = (i_config[8:1] >> 1) - 1;
+                    r_cdiv <= (i_config[8:1] >> 1) - 1;
                 else 
-                    r_cdiv = 0;
+                    r_cdiv <= 0;
                     
                 r_state <= CONFIG;
             end
@@ -79,11 +81,11 @@ module clock_divider
     always @(posedge i_clk) begin
         if (r_state == RUN) begin
             if (r_fast_cycle != r_cdiv)
-                r_fast_cycle <= r_fast_cycle + 1;
+                r_fast_cycle <= r_next_fast;
 
             else if (r_fast_cycle == r_cdiv) begin
                 r_fast_cycle <= 0;
-                r_slow_cycle <= r_slow_cycle + 1;
+                r_slow_cycle <= r_next_slow;
                 r_clk <= ~r_clk;
             end
         end
@@ -99,6 +101,8 @@ module clock_divider
         // Defaults
         o_idle = 1;
         o_clk = 0;
+        r_next_fast = 0;
+        r_next_slow = 0;
         r_next_state = r_state;
 
         case(r_state)
@@ -114,9 +118,15 @@ module clock_divider
 
             RUN: begin
                 o_idle = 0;
+                r_next_fast = r_fast_cycle + 1;
 
                 if (r_slow_cycle == 16)
                     r_next_state = IDLE;
+
+                else if (r_fast_cycle == r_cdiv) begin
+                    r_next_slow = r_slow_cycle + 1;
+                end
+                
                 else
                     o_clk = r_clk;
             end
