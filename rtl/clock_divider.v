@@ -7,12 +7,10 @@
 //                  SPI environment
 // Author:          Joseph Bellahcen <tornupnegatives@gmail.com>
 //
-// Notes:           Generates 8 slow clock pulses before entering IDLE state
+// Notes:           Configurable speed ranges from f_input/2 to f_input/255
+//                  Divisor should be even and non-zero
 //
-//                  f_output = f_input / divisor
-//
-//                  The divisor should be an even number
-//                  A divisor of 0 will result in a half-speed clock
+//                  Generates 8 slow clocks and then idles
 ///////////////////////////////////////////////////////////////////////////////
 
 module clock_divider
@@ -34,22 +32,27 @@ module clock_divider
         output reg o_clk_n
     );
 
+    // Operational states
     localparam [1:0]
         RESET  = 0,
         IDLE   = 1,
         CONFIG = 2,
         RUN    = 3;
 
+    // State machine
     reg [1:0] r_state;
     reg [1:0] r_next_state;
 
-    //reg [7:0]  r_config;
+    // CLock divisor
     reg [7:0]  r_cdiv;
 
+    // Counter
     reg [7:0] r_fast_cycle;
     reg [7:0] r_slow_cycle;
     reg [7:0] r_next_fast;
     reg [7:0] r_next_slow;
+
+    // Slow clock
     reg r_clk;
 
     // State machine logic
@@ -57,10 +60,14 @@ module clock_divider
         if (~i_rst_n)
             r_state <= RESET;
 
+        // Only accept config/start commands when IDLE
         else if (r_state == IDLE) begin
+            // Register clock divisor (ensure even)
             if (i_config[0]) begin
                 if (i_config[8:1] != 0)
                     r_cdiv <= (i_config[8:1] >> 1) - 1;
+                    
+                // Default slow clock is half speed
                 else 
                     r_cdiv <= 0;
                     
@@ -78,10 +85,12 @@ module clock_divider
 
     // Counter
     always @(posedge i_clk) begin
+        // Only count when RUNning
         if (r_state == RUN) begin
             if (r_fast_cycle != r_cdiv)
                 r_fast_cycle <= r_next_fast;
 
+            // Toggle slow clock when fast clock pulses div times
             else if (r_fast_cycle == r_cdiv) begin
                 r_fast_cycle <= 0;
                 r_slow_cycle <= r_next_slow;
@@ -119,6 +128,7 @@ module clock_divider
                 o_idle = 0;
                 r_next_fast = r_fast_cycle + 1;
 
+                // Enter idle state after 16 slow-clock edges
                 if (r_slow_cycle == 16)
                     r_next_state = IDLE;
 
