@@ -1,53 +1,126 @@
+`timescale 1ns / 1ps
+
 ///////////////////////////////////////////////////////////////////////////////
 // Module Name:     Clock Divider
 // Target Devices:  Xilinx Artix-7
-// Description:     Simple clock divider based on a counter
-//                  f_output = f_input / div
+// Description:     Configurable, finite-pulse clock divider for use in a
+//                  SPI environment
+// Author:          Joseph Bellahcen <tornupnegatives@gmail.com>
 //
-// Notes:
+// Notes:           Generates 8 slow clock pulses before entering IDLE state
+//                  f_output = f_input / divisor
+//                  The divisor should be an even number
+//                  A divisor of 0 will result in a half-speed clock
 ///////////////////////////////////////////////////////////////////////////////
 
 module clock_divider
     (
-        // FPGA interface
-        input i_clk,            // Fast FPGA clock
-        input i_rst_n,          // Active low reset
+        input i_clk,
+        input i_rst_n,
 
-        input [31:0] i_div,     // Number of FPGA clock cycles per clock slock
-        output reg o_clk        // Slow clock
+        // ┌───────────────────────────┬────────────────────────┐
+        // │         C8...C1           │           C0           │
+        // ├───────────────────────────┼────────────────────────┤
+        // │ Clock divisor (MSB...LSB) │ Register configuration │
+        // └───────────────────────────┴────────────────────────┘
+        input [8:0] i_config,
+
+        input i_start_n,
+
+        output reg o_idle,
+        output reg o_clk,
+        output reg o_clk_n
     );
 
-    reg [31:0] r_div;
-    reg [31:0] r_count;
+    localparam [1:0]
+        RESET  = 0,
+        IDLE   = 1,
+        CONFIG = 2,
+        RUN    = 3;
 
-    // Register div to change clock frequency
-    always @(posedge i_clk) begin
-        // Use default value on reset
-        if (!i_rst_n)
-            r_div <= 2;
-        
+    reg [1:0] r_state;
+    reg [1:0] r_next_state;
+
+    reg [7:0]  r_config;
+    reg [7:0]  r_cdiv;
+
+    reg [7:0] r_fast_cycle;
+    reg [7:0] r_slow_cycle;
+    reg r_clk;
+
+    // State machine logic
+    always @(posedge i_clk or negedge i_rst_n) begin
+        if (~i_rst_n)
+            r_state <= RESET;
+
+        else if (r_state == IDLE) begin
+            if (i_config[0]) begin
+                r_config <= i_config[9:1];
+                r_state <= CONFIG;
+            end
+
+            if (~i_start_n) begin
+                r_state <= RUN;
+            end
+        end
+
         else
-            r_div <= i_div;
+            r_state <= r_next_state;
     end
 
-    // Generate slow clock
-    always @(posedge i_clk) begin
-        // Idle clock when reset low
-        if (!i_rst_n) begin
-            r_count <= 0;
-            o_clk <= 0;
+    // Counter
+    always @(posedge i_clk or negedge i_rst_n) begin
+        if (r_state == RUN) begin
+            if (r_fast_cycle != r_cdiv)
+                r_fast_cycle <= r_fast_cycle + 1;
+
+            else if (r_fast_cycle == r_cdiv) begin
+                r_fast_cycle <= 0;
+                r_slow_cycle <= r_slow_cycle + 1;
+                r_clk <= ~r_clk;
+            end
         end
 
         else begin
-            r_count <= r_count + 1;
-
-            if (r_count == r_div) begin
-                r_count <= 0;
-                o_clk <= 1;
-            end
-
-            else
-                o_clk <= 0;
+            r_fast_cycle <= 0;
+            r_slow_cycle <= 0;
+            r_clk <= 0;
         end
     end
+
+    always @(*) begin
+        // Defaults
+        o_idle = 1;
+        o_clk = 0;
+        //r_cdiv = 1;
+        r_next_state = r_state;
+
+        case(r_state)
+            RESET:
+                r_next_state = IDLE;
+
+            CONFIG: begin
+                o_idle = 0;
+                o_clk = 0;
+
+                if (r_config[7:0] != 0)
+                    r_cdiv = (r_config[7:0] / 2) - 1;
+                else 
+                    r_cdiv = 0;
+
+                r_next_state = IDLE;
+            end
+
+            RUN: begin
+                o_idle = 0;
+
+                if (r_slow_cycle == 16)
+                    r_next_state = IDLE;
+                else
+                    o_clk = r_clk;
+            end
+        endcase
+    end
+
+    assign o_clk_n = ~o_clk;
 endmodule
