@@ -17,8 +17,8 @@ module clock_divider_tb;
         .o_clk
     );
 
-    // 100 MHz clock
-    always #5 i_clk = ~i_clk;
+    // 50 MHz clock
+    always #10 i_clk = ~i_clk;
 
     // Waveform generation
     initial begin
