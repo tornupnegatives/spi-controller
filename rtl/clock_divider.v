@@ -8,7 +8,6 @@
 // Author:          Joseph Bellahcen <tornupnegatives@gmail.com>
 //
 // Notes:           Generates 8 slow clock pulses before entering IDLE state
-//                  Max f_input = 50 MHz
 //
 //                  f_output = f_input / divisor
 //
