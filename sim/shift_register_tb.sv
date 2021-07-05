@@ -6,7 +6,6 @@ module shift_register_tb;
 
     logic [1:0] i_mode;
     logic       i_output_enable_n;
-    logic       i_slow_clk;
 
     logic [7:0] i_parallel;
     logic       i_serial;
@@ -14,6 +13,7 @@ module shift_register_tb;
     logic [7:0] o_parallel;
     logic       o_serial;
 
+    // Number of iterations per each task
     shortint unsigned n_trials;
 
     shift_register DUT(
@@ -21,7 +21,6 @@ module shift_register_tb;
         .i_rst_n,
         .i_mode,
         .i_output_enable_n,
-        .i_slow_clk,
         .i_parallel,
         .i_serial,
         .o_parallel,
@@ -46,17 +45,16 @@ module shift_register_tb;
         i_rst_n = 1;
         i_mode = 0;
         i_output_enable_n = 1;
-        i_slow_clk = 0;
         i_parallel = 0;
         i_serial = 0;
 
         test_reset;
 
-        // Basic functionality tests
+        // Basic input tests (slow clock)
         for (int i = 0; i < n_trials; i++) begin
-            test_right_shift($random);
+            test_shift($random, 1);
             test_parallel_load($random);
-            test_left_shift($random);
+            test_shift($random, 0);
         end
 
         test_reset;
@@ -88,6 +86,7 @@ module shift_register_tb;
         $display("Parallel loading %d...", value);
 
         @(negedge i_clk) begin
+            i_output_enable_n = 1;
             i_parallel = value;
             i_mode = 2'b11;
         end
@@ -96,9 +95,10 @@ module shift_register_tb;
             i_mode = 0;
             i_output_enable_n = 0;
         end
+        
+        @(negedge i_clk);
 
         @(negedge i_clk) begin
-            i_output_enable_n = 1;
             assert(o_parallel === value) else begin
                 $display("Output mismatch: %d", o_parallel);
                 $fatal(1, "Failed to parallel load");
@@ -106,66 +106,41 @@ module shift_register_tb;
         end
     endtask
 
-    task test_right_shift;
+    task test_shift;
         input [7:0] value;
+        input mode;
 
-        $display("Right shifting %d...", value);
+        // Generate random slow clock between 12.5 - 100 MHz
+        //logic slow_clk;
+        //static int slow_ratio = $urandom%70 + 10;
 
-        @(negedge i_clk)
-            i_mode = 2'b01;
+        $display("%s shifting %d...", mode?"Right":"Left", value);
 
-        for (int i = 0; i < 8; i++) begin
-            @(negedge i_clk) begin
-                i_slow_clk = 1;
-                i_serial = value[i];
-
-                #3 i_slow_clk = 0;
-            end
+        @(negedge i_clk) begin
+            //i_slow_clk = 0;
+            i_output_enable_n = 1;
+            i_mode = mode ? 2'b01: 2'b10;
         end
 
+        for (int i = 0; i < 8; i++) begin
+            //#slow_ratio i_mode = mode ? 2'b01: 2'b10;
+            @(negedge i_clk)
+                i_serial = mode ? value[i] : value[7-i];
+            //#slow_ratio i_mode = 0;
+        end
+        
         @(negedge i_clk) begin
             i_mode = 0;
             i_serial = 0;
             i_output_enable_n = 0;
         end
-
+        
+        @(negedge i_clk);
+            
         @(negedge i_clk) begin
-            i_output_enable_n = 1;
             assert(o_parallel === value) else begin
                 $display("Output mismatch: %d", o_parallel);
-                $fatal(1, "Failed to right shift");
-            end
-        end
-    endtask
-
-    task test_left_shift;
-        input [7:0] value;
-
-        $display("Left shifting %d...", value);
-
-        @(negedge i_clk)
-            i_mode = 2'b10;
-
-        for (int i = 0; i < 8; i++) begin
-            @(negedge i_clk) begin
-                i_slow_clk = 1;
-                i_serial = value[7-i];
-
-                #3 i_slow_clk = 0;
-            end
-        end
-
-        @(negedge i_clk) begin
-            i_mode = 0;
-            i_serial = 0;
-            i_output_enable_n = 0;
-        end
-
-        @(negedge i_clk) begin
-            i_output_enable_n = 1;
-            assert(o_parallel === value) else begin
-                $display("Output mismatch: %d", o_parallel);
-                $fatal(1, "Failed to left shift");
+                $fatal(1, "Failed to %s shift", mode?"right":"left");
             end
         end
     endtask

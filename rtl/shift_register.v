@@ -5,8 +5,6 @@
 // Engineer:        Joseph Bellahcen <josbella@iu.edu>
 // Target Devices:  Xilinx Artix-7
 // Description:     Universal 8-bit shift register
-//
-// Notes:           Maximum frequency: 40 MHz
 ///////////////////////////////////////////////////////////////////////////////
 
 // parallel load -> parallel out on serial clock
@@ -31,8 +29,6 @@ module shift_register
         input [1:0] i_mode,
         // Move internal register to parallel output (async)
         input       i_output_enable_n,
-        // Controls serial IO
-        input       i_slow_clk,
 
         // IO
         input [7:0]  i_parallel,
@@ -50,68 +46,45 @@ module shift_register
         HOLD            = 2'b00,
         RESET           = 3'b100;
 
-    // State machine
-    reg [2:0] r_state;
-    reg [2:0] r_next_state;
-
     // Shift and output registers
-    reg [7:0]   r_data;
+    reg [7:0]   r_parallel;
     reg [7:0]   r_output;
+    reg         r_serial;
 
-    // State machine logic
     always @(posedge i_clk or negedge i_rst_n) begin
-        if (~i_rst_n)
-            r_state <= RESET;
-        
-        else if (i_mode)
-            r_state <= i_mode;
-        
-        else
-            r_state <= r_next_state;
+        if (~i_rst_n) begin
+            r_parallel <= 0;
+            r_serial <= 0;
+            r_output <= 0;
+        end
+
+        else if (i_mode) begin
+            case(i_mode)
+                PARALLEL_LOAD: begin
+                    r_serial <= 0;
+                    r_parallel <= i_parallel;
+                end
+
+                LEFT_SHIFT: begin
+                    r_serial <= r_parallel[7];
+                    r_parallel <= {r_parallel[6:0], i_serial};
+                end
+
+                RIGHT_SHIFT: begin
+                    r_serial <= r_parallel[0];
+                    r_parallel <= {i_serial, r_parallel[7:1]};
+                end
+            endcase
+        end
     end
 
     always @(*) begin
-        // Defaults
-        r_output = 0;
-        r_next_state = r_state;
-        o_serial = 0;
-        o_parallel = 0;
+        o_serial = r_serial;
+        o_parallel = 7'h0;
 
-        case (r_state)
-            RESET: begin 
-                o_serial = 0;
-                o_parallel = 0;
-                r_data = 0;
-                r_next_state = HOLD;
-            end
-
-            PARALLEL_LOAD: begin
-                r_data = i_parallel;
-                r_next_state = HOLD;
-            end
-
-            LEFT_SHIFT: begin
-                if (i_slow_clk) begin
-                    o_serial = r_data[7];
-                    r_data = {r_data[6:0], i_serial};
-                    
-                end
-
-                r_next_state = HOLD;
-            end
-
-            RIGHT_SHIFT: begin
-                if (i_slow_clk) begin
-                    o_serial = r_data[0];
-                    r_data = {i_serial, r_data[7:1]};
-                end
-
-                r_next_state = HOLD;
-            end
-        endcase
-
-        // Asynchronous output enable
-        if (~i_output_enable_n)
-            o_parallel = r_data;
+        if (~i_output_enable_n) begin
+            o_serial = r_serial;
+            o_parallel = r_parallel;
+        end
     end
 endmodule
