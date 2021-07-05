@@ -3,32 +3,35 @@
 module shift_register_tb;
     logic i_clk;
     logic i_rst_n;
-    logic i_s0;
-    logic i_s1;
-    logic i_oe0;
-    logic i_oe1;
+
+    logic [1:0] i_mode;
+    logic       i_output_enable_n;
+    logic       i_slow_clk;
 
     logic [7:0] i_parallel;
     logic       i_serial;
+
     logic [7:0] o_parallel;
     logic       o_serial;
+
+    shortint unsigned n_trials;
 
     shift_register DUT(
         .i_clk,
         .i_rst_n,
-        .i_s0,
-        .i_s1,
-        .i_oe0,
-        .i_oe1,
+        .i_mode,
+        .i_output_enable_n,
+        .i_slow_clk,
         .i_parallel,
         .i_serial,
         .o_parallel,
         .o_serial
     );
 
-    // 40 MHz clock
-    always #12.5 i_clk = ~i_clk;
+    // 100 MHz clock
+    always #5 i_clk = ~i_clk;
 
+    // Waveform generation
     initial begin
         $dumpfile("shift_register.vcd");
         $dumpvars(0, shift_register_tb);
@@ -36,174 +39,133 @@ module shift_register_tb;
 
     initial begin
         $display("Simulation start");
+
+        n_trials = 100;
+
         i_clk = 0;
         i_rst_n = 1;
-        i_s0 = 0;
-        i_s1 = 0;
-        i_oe0 = 1;
-        i_oe1 = 0;
+        i_mode = 0;
+        i_output_enable_n = 1;
+        i_slow_clk = 0;
         i_parallel = 0;
         i_serial = 0;
 
-        $display("Testing reset");
         test_reset;
 
-        $display("Testing parallel load");
-        for (int i = 0; i < 9; i++)
+        // Basic functionality tests
+        for (int i = 0; i < n_trials; i++) begin
+            test_right_shift($random);
             test_parallel_load($random);
+            test_left_shift($random);
+        end
 
         test_reset;
-        $display("Testing right shift");
-        i_oe0 = 0;
-        i_oe1 = 0;
-        test_shift_right;
-
-        test_reset;
-        $display("Testing left shift");
-        i_oe0 = 0;
-        i_oe1 = 0;
-        test_shift_left;
-
-        $display("Testing output modes (check waveform)");
-        i_s0 = 0;
-        i_s1 = 0;
-
-        // High impedance on
-        @(negedge i_clk) begin
-            i_oe0 = 1;
-            i_oe1 = 1;
-        end
-
-        // High impedance off
-        @(negedge i_clk) begin
-            i_oe0 = 1;
-            i_oe1 = 0;
-        end
-
-        // Low output on
-        @(negedge i_clk) begin
-            i_oe0 = 0;
-            i_oe1 = 1;
-        end
-
-        // Low output off
-        @(negedge i_clk) begin
-            i_oe0 = 0;
-            i_oe1 = 0;
-        end
-    
-        @(negedge i_clk);
         
-        $display("Simulation complete");
+        $display("Simulation finish");
         $finish;
     end
 
     task test_reset;
-        repeat (16) @(negedge i_clk)
+        $display("Resetting...");
+        @(negedge i_clk)
             i_rst_n = 0;
 
-        @(negedge i_clk) begin
-            assert(o_parallel == 'b0 && o_serial == 'b0) else
-            $fatal(1, "Reset failed");
+        // Hold
+        repeat (16) @(negedge i_clk);
 
+        @(negedge i_clk)
             i_rst_n = 1;
+
+        @(negedge i_clk) begin
+            assert(o_parallel === 0 && o_serial === 0) else
+                $fatal(1, "Failed to enter known state after reset");
         end
     endtask
 
     task test_parallel_load;
-        input [7:0] data;
+        input [7:0] value;
+
+        $display("Parallel loading %d...", value);
 
         @(negedge i_clk) begin
-            i_s0 = 1;
-            i_s1 = 1;
-            i_oe1 = 0;
-            i_parallel = data;
+            i_parallel = value;
+            i_mode = 2'b11;
         end
+
+        @(negedge i_clk) begin
+            i_mode = 0;
+            i_output_enable_n = 0;
+        end
+
+        @(negedge i_clk) begin
+            i_output_enable_n = 1;
+            assert(o_parallel === value) else begin
+                $display("Output mismatch: %d", o_parallel);
+                $fatal(1, "Failed to parallel load");
+            end
+        end
+    endtask
+
+    task test_right_shift;
+        input [7:0] value;
+
+        $display("Right shifting %d...", value);
 
         @(negedge i_clk)
-            i_s0 = 0;
-            i_s1 = 0;
+            i_mode = 2'b01;
 
-            assert(o_parallel == data && o_serial == 'b0) else
-            $fatal(1, "Parallel load failed");
-    endtask
-
-    task test_shift_right;
-        reg [7:0] prev_data;
-        reg [7:0] data;
-
-        data = 'b0;
-        for (int i = 0; i < 9; i++) begin
-            // Disable output
-            i_oe1 = 0;
-
-            prev_data = data;
-            data = $random;
-
-            for (int j = 0; j < 8; j++) begin
-                i_s0 = 1;
-                i_s1 = 0;
-
-                @(negedge i_clk) begin
-                    i_serial = data[j];
-                end
-
-                @(posedge i_clk)
-                    assert(o_serial == prev_data[j]) else
-                    $fatal(1, "Right shift (serial) failed");
-            end
-
+        for (int i = 0; i < 8; i++) begin
             @(negedge i_clk) begin
-                // Hold
-                i_s0 = 0;
-                i_s1 = 0;
-            end
+                i_slow_clk = 1;
+                i_serial = value[i];
 
-            @(negedge i_clk) begin
-                assert(o_parallel == data) else
-                $fatal(1, "Right shift failed");
+                #3 i_slow_clk = 0;
+            end
+        end
+
+        @(negedge i_clk) begin
+            i_mode = 0;
+            i_serial = 0;
+            i_output_enable_n = 0;
+        end
+
+        @(negedge i_clk) begin
+            i_output_enable_n = 1;
+            assert(o_parallel === value) else begin
+                $display("Output mismatch: %d", o_parallel);
+                $fatal(1, "Failed to right shift");
             end
         end
     endtask
 
-    task test_shift_left;
-        reg [7:0] prev_data;
-        reg [7:0] data;
+    task test_left_shift;
+        input [7:0] value;
 
-        data = 'b0;
-        for (int i = 0; i < 9; i++) begin
-            // Disable output
-            i_oe1 = 0;
+        $display("Left shifting %d...", value);
 
-            prev_data = data;
-            data = $random;
+        @(negedge i_clk)
+            i_mode = 2'b10;
 
-            for (int j = 0; j < 8; j++) begin
-                i_s0 = 0;
-                i_s1 = 1;
-
-                @(negedge i_clk) begin
-                    i_serial = data[j];
-                end
-
-                @(posedge i_clk);
-                    assert(o_serial == prev_data[j]) else
-                    $fatal(1, "Left shift (serial) failed");
-            end
-
+        for (int i = 0; i < 8; i++) begin
             @(negedge i_clk) begin
-                // Hold
-                i_s0 = 0;
-                i_s1 = 0;
-            end
+                i_slow_clk = 1;
+                i_serial = value[7-i];
 
-            @(negedge i_clk) begin
-                assert(o_parallel == {data[0], data[1],
-                                      data[2], data[3],
-                                      data[4], data[5],
-                                      data[6], data[7]    
-                                      }) else
-                $fatal(1, "Left shift failed");
+                #3 i_slow_clk = 0;
+            end
+        end
+
+        @(negedge i_clk) begin
+            i_mode = 0;
+            i_serial = 0;
+            i_output_enable_n = 0;
+        end
+
+        @(negedge i_clk) begin
+            i_output_enable_n = 1;
+            assert(o_parallel === value) else begin
+                $display("Output mismatch: %d", o_parallel);
+                $fatal(1, "Failed to left shift");
             end
         end
     endtask
