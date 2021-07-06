@@ -51,13 +51,16 @@ module shift_register_tb;
         test_reset;
 
         // Basic input tests (slow clock)
-        for (int i = 0; i < n_trials; i++) begin
+        repeat (n_trials) begin
             test_shift($random, 1);
             test_parallel_load($random);
             test_shift($random, 0);
         end
 
         test_reset;
+
+        repeat (n_trials)
+            test_serial_out($urandom%255);
         
         $display("Simulation finish");
         $finish;
@@ -143,5 +146,40 @@ module shift_register_tb;
                 $fatal(1, "Failed to %s shift", mode?"right":"left");
             end
         end
+    endtask
+
+    task test_serial_out;
+        input [7:0] num;
+        logic [7:0] result;
+
+        $display("Testing serial out (%d)", num);
+
+        for (int i = 0; i < 8; i++) begin
+            @(negedge i_clk) begin
+                i_mode = 2'b01;
+                i_serial = num[i];
+            end
+        end
+
+       @(negedge i_clk)
+            i_mode = 0;
+
+        for (int i = 0; i < 9; i++) begin
+            @(posedge i_clk) begin
+                i_mode = 2'b01;
+                i_serial = 0;
+                #2 result[i] = o_serial;
+            end
+        end
+
+        @(negedge i_clk);
+
+        @(negedge i_clk) begin
+            assert(result === num) else begin
+                $display("Output mismatch: %d", result);
+                $fatal(1, "Serial out failure");
+            end
+        end
+
     endtask
 endmodule
