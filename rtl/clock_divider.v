@@ -56,7 +56,7 @@ module clock_divider
     reg r_clk;
 
     // State machine logic
-    always @(posedge i_clk or negedge i_rst_n) begin
+    always @(posedge i_clk) begin
         if (~i_rst_n)
             r_state <= RESET;
 
