@@ -18,16 +18,16 @@ module edge_detector(
         output reg o_falling_edge
     );
 
-    reg r_delayed_clk;
+    reg [2:0] r_delayed_clk;
 
     always @(posedge i_clk) begin
         if (~i_rst_n)
             r_delayed_clk <= 0;
         else
-            r_delayed_clk <= i_slow_clk;    
+            r_delayed_clk <= {i_slow_clk, r_delayed_clk[2:1]};    
     end
 
-    assign o_rising_edge = i_slow_clk & ~r_delayed_clk;
-    assign o_falling_edge = ~i_slow_clk & r_delayed_clk;
+    assign o_rising_edge = (~r_delayed_clk[1] & r_delayed_clk[0]) & i_rst_n;
+    assign o_falling_edge = (r_delayed_clk[1] & ~r_delayed_clk[0]) & i_rst_n;
 
 endmodule
