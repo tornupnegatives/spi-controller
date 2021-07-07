@@ -28,8 +28,8 @@ module clock_divider
         input i_start_n,
 
         output reg o_idle,
-        output reg o_clk,
-        output reg o_clk_n
+        output o_clk,
+        output o_clk_n
     );
 
     // Operational states
@@ -108,7 +108,6 @@ module clock_divider
     always @(*) begin
         // Defaults
         o_idle = 1;
-        o_clk = 0;
         r_next_fast = 0;
         r_next_slow = 0;
         r_next_state = r_state;
@@ -119,8 +118,6 @@ module clock_divider
 
             CONFIG: begin
                 o_idle = 0;
-                o_clk = 0;
-
                 r_next_state = IDLE;
             end
 
@@ -135,13 +132,10 @@ module clock_divider
                 else if (r_fast_cycle == r_cdiv) begin
                     r_next_slow = r_slow_cycle + 1;
                 end
-                
-                else
-                    o_clk = r_clk;
             end
         endcase
-
-        // Inverted clock
-        o_clk_n = ~o_clk;
     end
+
+    assign o_clk = r_clk;
+    assign o_clk_n = ~o_clk;
 endmodule
