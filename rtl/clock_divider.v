@@ -15,21 +15,28 @@
 
 module clock_divider
     (
+        // FPGA interface
         input i_clk,
         input i_rst_n,
 
+        // Control interface
         // ┌───────────────────────────┬────────────────────────┐
         // │         C8...C1           │           C0           │
         // ├───────────────────────────┼────────────────────────┤
         // │ Clock divisor (MSB...LSB) │ Register configuration │
         // └───────────────────────────┴────────────────────────┘
         input [8:0] i_config,
-
         input i_start_n,
 
+        // Clock output
         output reg o_idle,
         output o_clk,
-        output o_clk_n
+        output o_clk_n,
+        
+        // Metadata output
+        output reg   o_rising_edge,
+        output reg   o_falling_edge,
+        output [7:0] o_slow_count
     );
 
     // Operational states
@@ -108,6 +115,8 @@ module clock_divider
     always @(*) begin
         // Defaults
         o_idle = 1;
+        o_rising_edge = 0;
+        o_falling_edge = 0;
         r_next_fast = 0;
         r_next_slow = 0;
         r_next_state = r_state;
@@ -134,8 +143,15 @@ module clock_divider
                 end
             end
         endcase
+        
+        if (r_clk && r_next_fast == r_cdiv + 1)
+            o_falling_edge = 1;
+        else if (~r_clk && r_next_fast == r_cdiv + 1)
+            o_rising_edge = 1;
+
     end
 
     assign o_clk = r_clk;
     assign o_clk_n = ~o_clk;
+    assign o_slow_count = r_slow_cycle;
 endmodule
