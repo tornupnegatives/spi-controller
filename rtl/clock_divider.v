@@ -64,8 +64,10 @@ module clock_divider
 
     // State machine logic
     always @(posedge i_clk) begin
-        if (~i_rst_n)
+        if (~i_rst_n) begin
+            r_cdiv = 0;
             r_state <= RESET;
+        end
 
         // Only accept config/start commands when IDLE
         else if (r_state == IDLE) begin
@@ -93,7 +95,7 @@ module clock_divider
     // Counter
     always @(posedge i_clk) begin
         // Only count when RUNning
-        if (r_state == RUN) begin
+        if (r_state == RUN && r_next_state != IDLE) begin
             if (r_fast_cycle != r_cdiv)
                 r_fast_cycle <= r_next_fast;
 
