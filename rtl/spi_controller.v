@@ -6,7 +6,8 @@
 // Description:     Configurable SPI controller
 // Author:          Joseph Bellahcen <tornupnegatives@gmail.com>
 //
-// Notes:
+// Notes:           Currently supports SPI MODE: 0, 1
+//                  Current max clock ratio: 8
 ///////////////////////////////////////////////////////////////////////////////
 
 module spi_controller(

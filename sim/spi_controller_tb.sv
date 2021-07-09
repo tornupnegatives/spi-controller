@@ -22,7 +22,7 @@ module spi_controller_tb;
         .i_config,
         .i_tx,
         .i_tx_valid,
-        .i_cipo,
+        .i_cipo(o_copi),
         .o_ready,
         .o_rx,
         .o_rx_valid,
@@ -49,17 +49,19 @@ module spi_controller_tb;
         $display("MODE 0 TESTS");
         configure(0, 2);
         repeat (5)
-            send_byte($random, $random);
+            send_byte($random);
 
         $display("MODE 1 TESTS");
         configure(1, 4);
         repeat (5)
-            send_byte($random, $random);
+            send_byte($random);
 
+        /*
         $display("MODE 2 TESTS");
-        configure(2, 8);
+        configure(2, 6);
         repeat (5)
-            send_byte($random, $random);
+            send_byte($random);
+        */
 
         reset;
 
@@ -87,7 +89,7 @@ module spi_controller_tb;
         input [7:0] clk_ratio;
 
         $display("Configuring...");
-        $display("MODE: %d, CLOCK SPEED: %f", spi_mode, 1.0/clk_ratio);
+        $display("MODE: %d, CLOCK SPEED: %f MHz", spi_mode, (1.0/clk_ratio) * 100);
 
         @(posedge i_clk)
             i_config = {clk_ratio, spi_mode, 1'b1};
@@ -105,13 +107,12 @@ module spi_controller_tb;
 
     task send_byte;
         input [7:0] data;
-        input [7:0] dummy_data;
 
         $display("Sending x%x", data);
-        $display("Receiving x%x", dummy_data);
 
         @(posedge i_clk) begin
             i_tx = data;
+            i_cipo = 0;
             i_tx_valid = 1;
         end
         
@@ -121,18 +122,13 @@ module spi_controller_tb;
                 @(posedge i_clk)
                     i_tx_valid = 0;
 
-        // Send dummy peripheral data
-        for (int i = 7; i >= 0; i--) begin
-            @(posedge o_sclk) begin
-                i_cipo = dummy_data[i];
-            end
-        end
-
         // Wait for command to finish
         if (~o_ready)
             @(posedge o_ready);
 
-        assert(o_rx === dummy_data) else
+        $display("Received x%x", o_rx);
+
+        assert(o_rx === data) else
             $fatal(1, "Received x%x", o_rx);
     endtask
 endmodule
