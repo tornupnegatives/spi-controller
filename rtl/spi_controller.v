@@ -69,11 +69,11 @@ module spi_controller(
     reg [8:0]  r_clk_config;
     reg        r_clk_start;
     wire       w_clk_idle;
-    reg        r_clk;
-    reg        r_clk_n;
+    wire       w_clk;
+    wire       w_clk_n;
     wire       w_rising_edge;
     wire       w_falling_edge;
-    reg [7:0]  r_clk_count;
+    wire [7:0] w_clk_count;
 
     clock_divider cd(
         .i_clk(i_clk),
@@ -81,11 +81,11 @@ module spi_controller(
         .i_config(r_clk_config),
         .i_start_n(r_clk_start),
         .o_idle(w_clk_idle),
-        .o_clk(r_clk),
-        .o_clk_n(r_clk_n),
+        .o_clk(w_clk),
+        .o_clk_n(w_clk_n),
         .o_rising_edge(w_rising_edge),
         .o_falling_edge(w_falling_edge),
-        .o_slow_count(r_clk_count)
+        .o_slow_count(w_clk_count)
     );
 
     always @(posedge i_clk) begin
@@ -181,7 +181,7 @@ module spi_controller(
             TXRX: begin
                 r_clk_start = 0;
 
-                if (r_clk_count == 15) begin
+                if (w_clk_count == 15) begin
                     r_clk_start = 1;
                     r_next_state = TXRX_FINAL;
                 end
@@ -194,7 +194,7 @@ module spi_controller(
         o_ready     = (r_state == READY) || (r_state == RX_VALID);
         o_rx_valid  = (r_state == RX_VALID);
         o_rx        = r_rx;
-        o_sclk      = r_cpol ? r_clk_n : r_clk;
+        o_sclk      = r_cpol ? w_clk_n : w_clk;
         o_copi      = r_copi;
     end
 endmodule
