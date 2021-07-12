@@ -22,7 +22,7 @@ module spi_controller_tb;
         .i_config,
         .i_tx,
         .i_tx_valid,
-        .i_cipo(o_copi),
+        .i_cipo,
         .o_ready,
         .o_rx,
         .o_rx_valid,
@@ -49,12 +49,12 @@ module spi_controller_tb;
         $display("MODE 0 TESTS");
         configure(0, 2);
         repeat (5)
-            send_byte($random);
+            send_byte($random, $random);
 
         $display("MODE 1 TESTS");
         configure(1, 4);
         repeat (5)
-            send_byte($random);
+            send_byte($random, $random);
 
         /*
         $display("MODE 2 TESTS");
@@ -107,8 +107,9 @@ module spi_controller_tb;
 
     task send_byte;
         input [7:0] data;
+        input [7:0] rx;
 
-        $display("Sending x%x", data);
+        $display("Sending x%x\tReceiving x%x", data, rx);
 
         @(posedge i_clk) begin
             i_tx = data;
@@ -121,6 +122,13 @@ module spi_controller_tb;
             @(negedge o_ready)
                 @(posedge i_clk)
                     i_tx_valid = 0;
+                    
+        // Send dummy peripheral data
+        for (int i = 7; i >= 0; i--) begin
+            @(posedge o_sclk) begin
+                i_cipo = rx[i];
+            end
+        end
 
         // Wait for command to finish
         if (~o_ready)
@@ -128,7 +136,7 @@ module spi_controller_tb;
 
         $display("Received x%x", o_rx);
 
-        assert(o_rx === data) else
+        assert(o_rx === rx) else
             $fatal(1, "Received x%x", o_rx);
     endtask
 endmodule

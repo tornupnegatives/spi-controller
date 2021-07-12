@@ -29,7 +29,7 @@ module clock_divider
         input i_start_n,
 
         // Clock output
-        output reg o_idle,
+        (*dont_touch = "true"*) output reg o_idle,
         output o_clk,
         output o_clk_n,
         
