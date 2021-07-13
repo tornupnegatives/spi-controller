@@ -34,13 +34,13 @@ module clock_divider_tb;
         i_rst_n = 1;
         i_config = 0;
         i_start_n = 1;
-
+        
         test_reset;
-
+        
         // 0.4 MHz
         configure(250);
         test_clock(250);
-
+        
         // 1 MHz
         configure(100);
         test_clock(100);
@@ -52,7 +52,7 @@ module clock_divider_tb;
         // 50 MHz
         configure(2);
         test_clock(2);
-
+        
         $display("Simulation finish");
         $finish;
     end
@@ -60,16 +60,16 @@ module clock_divider_tb;
     task test_reset;
         $display("Resetting...");
         @(posedge i_clk)
-            i_rst_n = 0;
+            #1.5 i_rst_n = 0;
 
         // Hold
         repeat (16) @(posedge i_clk);
 
         repeat (5) @(posedge i_clk)
-            i_rst_n = 1;
+            #1.5 i_rst_n = 1;
 
         @(posedge i_clk) begin
-            assert(o_ready && ~o_clk) else
+            #1.5 assert(~o_clk) else
                 $fatal(1, "Failed to enter IDLE state after reset");
         end
     endtask
@@ -79,20 +79,21 @@ module clock_divider_tb;
         $display("Running clock at %f MHz", 100.0/divisor);
 
         @(posedge i_clk)
-            i_start_n = 0;
+            #1.5 i_start_n = 0;
 
         if (o_ready)
             @(negedge o_ready)
-                i_start_n = 1;
+                @(posedge i_clk)
+                    #1.5 i_start_n = 1;
 
-        repeat((divisor * 8))
+        repeat(divisor * 8)
             @(posedge i_clk)
                 assert(~o_ready) else
                     $fatal(1, "Failed to run clock at %f MHz (early exit)", 100.0/divisor);
 
         repeat (5) @(posedge i_clk);
         
-        assert(o_ready && ~o_clk) else
+        #1.5 assert(o_ready && ~o_clk) else
             $fatal(1, "Failed to run clock at %f MHz (late exit)", 100.0/divisor);
     endtask
 
@@ -102,16 +103,10 @@ module clock_divider_tb;
         $display("Configuring...");
 
         @(posedge i_clk)
-            i_config = {divisor, 1'h1};
-
-        if (o_ready)
-            @(negedge o_ready)
-                i_config = 9'h0;
-
-        // Wait until ready
-        if (~o_ready)
-            @(posedge o_ready);
+            #1.5 i_config = {divisor, 1'h1};
             
-        repeat(2) @(posedge i_clk);
+        @(posedge i_clk)
+            #1.5 i_config = 'h0;
+            
     endtask
 endmodule
