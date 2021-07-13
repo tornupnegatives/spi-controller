@@ -40,119 +40,92 @@ module clock_divider
     );
 
     // Operational states
-    localparam [3:0]
-        RESET  = 4'b0000,
-        READY  = 4'b0010,
-        CONFIG = 4'b0100,
-        RUN    = 4'b1000;
+    localparam [2:0]
+        RESET  = 3'b001,
+        READY  = 3'b010,
+        RUN    = 3'b100;
 
     // State machine
-    reg [3:0] r_state;
-    reg [3:0] r_next_state;
+    reg [2:0] r_state, r_next_state;
 
-    // CLock divisor
-    reg [8:0]  r_config;
-    reg [7:0]  r_cdiv;
-    reg [7:0]  r_next_cdiv;
+    // Clock divisor
+    reg [7:0]  r_cdiv, r_next_cdiv;
 
     // Counter
-    reg [7:0] r_fast_cycle;
-    reg [7:0] r_slow_cycle;
-    reg [7:0] r_next_fast;
-    reg [7:0] r_next_slow;
+    reg [7:0] r_fast_cycle, r_next_fast;
+    reg [7:0] r_slow_cycle, r_next_slow;
 
     // Slow clock
-    reg r_clk;
-    reg r_rising_edge;
-    reg r_falling_edge;
+    reg r_clk, r_next_clk;
+    reg r_rising_edge, r_falling_edge;
 
     // State machine logic
     always @(posedge i_clk) begin
         if (~i_rst_n) begin
-            r_cdiv <= 0;
-            r_config <= 0;
-            r_state <= RESET;
-        end
-       
-        else if (r_state == READY) begin
-            r_config <= i_config;
-            r_state <= r_next_state;
-        end
-
-        else if (r_state == CONFIG) begin
-            r_cdiv <= r_next_cdiv;
-            r_state <= r_next_state;
-        end
-
-        else
-            r_state <= r_next_state;
-    end
-
-    // Counter
-    always @(posedge i_clk) begin
-        // Only count when running
-        if (r_state == RUN && r_next_state != READY) begin
-            if (r_fast_cycle != r_cdiv)
-                r_fast_cycle <= r_next_fast;
-
-            // Toggle slow clock when fast clock pulses cdiv times
-            else if (r_fast_cycle == r_cdiv) begin
-                r_fast_cycle <= 0;
-                r_slow_cycle <= r_next_slow;
-                r_clk <= ~r_clk;
-            end
+            r_state         <= READY;
+            r_cdiv          <= 'h0;
+            r_fast_cycle    <= 'h0;
+            r_slow_cycle    <= 'h0;
+            r_clk           <= 'h0;
         end
 
         else begin
-            r_fast_cycle <= 0;
-            r_slow_cycle <= 0;
-            r_clk <= 0;
+            r_state         <= r_next_state;
+            r_cdiv          <= r_next_cdiv;
+            r_fast_cycle    <= r_next_fast;
+            r_slow_cycle    <= r_next_slow;
+            r_clk           <= r_next_clk;
         end
     end
 
     always @(*) begin
         // Defaults
-        r_rising_edge = 0;
-        r_falling_edge = 0;
-        r_next_fast = 0;
-        r_next_slow = 0;
-        r_next_cdiv = r_cdiv;
-        r_next_state = r_state;
+        r_next_state    = r_state;
+        r_next_cdiv     = r_cdiv;
+        r_next_fast     = r_fast_cycle;
+        r_next_slow     = r_slow_cycle;
+        r_next_clk      = r_clk;
+        
+        r_rising_edge   = 'h0;
+        r_falling_edge  = 'h0;
 
         case(r_state)
-            RESET:
-                r_next_state = READY;
-
-            CONFIG: begin
-                r_next_cdiv  = (r_config[8:1] >> 1) - 1;
-                r_next_state = READY;
-            end
-
-            RUN: begin
-                r_next_fast = r_fast_cycle + 1;
-
-                // Enter idle state after 16 slow-clock edges
-                if (r_slow_cycle == 16)
-                    r_next_state = READY;
-
-                else if (r_fast_cycle == r_cdiv) begin
-                    r_next_slow = r_slow_cycle + 1;
-                end
-
-                // Track edges
-                if (r_clk && r_next_fast == r_cdiv + 1)
-                    r_falling_edge = 1;
-                else if (~r_clk && r_next_fast == r_cdiv + 1)
-                    r_rising_edge = 1;
-            end
-
             READY: begin
-                if (i_config[0])
-                    r_next_state = CONFIG;
-
+                if (i_config[0]) begin
+                    r_next_cdiv  = (i_config[8:1] >> 1) - 'h1;
+                    r_next_state = READY;
+                end
+                
                 else if (~i_start_n)
                     r_next_state = RUN;
+             end       
 
+            RUN: begin
+                // Stop clocking after 8 slow clocks
+                if (r_slow_cycle == 16) begin
+                    r_next_fast = 'h0;
+                    r_next_slow = 'h0;
+                    r_next_clk = 'h0;
+                    
+                    r_next_state = READY;
+                end
+                    
+                // Toggle slow clock when fast clock hits divisor
+                else begin
+                    if (r_fast_cycle == r_cdiv) begin
+                        r_next_fast     = 'h0;
+                        r_next_slow     = r_slow_cycle + 'h1;
+                        r_next_clk      = ~r_clk;
+                        
+                        r_rising_edge   = r_clk;
+                        r_falling_edge  = ~r_clk;
+                       
+                    end
+                    
+                    else begin
+                        r_next_fast = r_fast_cycle + 'h1;
+                    end
+                end
             end
         endcase
     end
