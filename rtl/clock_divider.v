@@ -40,17 +40,18 @@ module clock_divider
     );
 
     // Operational states
-    localparam [1:0]
-        RESET  = 0,
-        READY  = 1,
-        CONFIG = 2,
-        RUN    = 3;
+    localparam [3:0]
+        RESET  = 4'b0000,
+        READY  = 4'b0010,
+        CONFIG = 4'b0100,
+        RUN    = 4'b1000;
 
     // State machine
-    reg [1:0] r_state;
-    reg [1:0] r_next_state;
+    reg [3:0] r_state;
+    reg [3:0] r_next_state;
 
     // CLock divisor
+    reg [8:0]  r_config;
     reg [7:0]  r_cdiv;
     reg [7:0]  r_next_cdiv;
 
@@ -68,8 +69,14 @@ module clock_divider
     // State machine logic
     always @(posedge i_clk) begin
         if (~i_rst_n) begin
-            r_cdiv = 0;
+            r_cdiv <= 0;
+            r_config <= 0;
             r_state <= RESET;
+        end
+       
+        else if (r_state == READY) begin
+            r_config <= i_config;
+            r_state <= r_next_state;
         end
 
         else if (r_state == CONFIG) begin
@@ -79,7 +86,6 @@ module clock_divider
 
         else
             r_state <= r_next_state;
- 
     end
 
     // Counter
@@ -118,7 +124,7 @@ module clock_divider
                 r_next_state = READY;
 
             CONFIG: begin
-                r_next_cdiv  = (i_config[8:1] >> 1) - 1;
+                r_next_cdiv  = (r_config[8:1] >> 1) - 1;
                 r_next_state = READY;
             end
 
@@ -141,7 +147,7 @@ module clock_divider
             end
 
             READY: begin
-                if (i_config[0])
+                if (r_config[0])
                     r_next_state = CONFIG;
 
                 else if (~i_start_n)

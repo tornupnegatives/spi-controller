@@ -37,6 +37,7 @@ module clock_divider_tb;
 
         test_reset;
 
+        /*
         // 0.4 MHz
         configure(250);
         test_clock(250);
@@ -48,6 +49,7 @@ module clock_divider_tb;
         // 25 MHz
         configure(4);
         test_clock(4);
+        */
 
         // 50 MHz
         configure(2);
@@ -65,7 +67,7 @@ module clock_divider_tb;
         // Hold
         repeat (16) @(posedge i_clk);
 
-        repeat (2) @(posedge i_clk)
+        repeat (5) @(posedge i_clk)
             i_rst_n = 1;
 
         @(posedge i_clk) begin
@@ -105,13 +107,14 @@ module clock_divider_tb;
             i_config = {divisor, 1'h1};
 
         if (o_ready)
-            @(negedge o_ready);
-
-        @(posedge o_ready)
-            i_config = 0;
+            @(negedge o_ready)
+                @(posedge i_clk)
+                    i_config = 0;
 
         // Wait until ready
         if (~o_ready)
             @(posedge o_ready);
+            
+        repeat(2) @(posedge i_clk);
     endtask
 endmodule
