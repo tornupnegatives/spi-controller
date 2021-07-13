@@ -29,7 +29,7 @@ module clock_divider
         input i_start_n,
 
         // Clock output
-        output o_idle,
+        output o_ready,
         output o_clk,
         output o_clk_n,
         
@@ -42,7 +42,7 @@ module clock_divider
     // Operational states
     localparam [1:0]
         RESET  = 0,
-        IDLE   = 1,
+        READY  = 1,
         CONFIG = 2,
         RUN    = 3;
 
@@ -72,16 +72,20 @@ module clock_divider
             r_state <= RESET;
         end
 
-        else begin
+        else if (r_state == CONFIG) begin
             r_cdiv <= r_next_cdiv;
             r_state <= r_next_state;
         end
+
+        else
+            r_state <= r_next_state;
+ 
     end
 
     // Counter
     always @(posedge i_clk) begin
         // Only count when running
-        if (r_state == RUN && r_next_state != IDLE) begin
+        if (r_state == RUN && r_next_state != READY) begin
             if (r_fast_cycle != r_cdiv)
                 r_fast_cycle <= r_next_fast;
 
@@ -111,11 +115,11 @@ module clock_divider
 
         case(r_state)
             RESET:
-                r_next_state = IDLE;
+                r_next_state = READY;
 
             CONFIG: begin
-                r_next_cdiv <= (i_config[8:1] >> 1) - 1;
-                r_next_state = IDLE;
+                r_next_cdiv  = (i_config[8:1] >> 1) - 1;
+                r_next_state = READY;
             end
 
             RUN: begin
@@ -123,7 +127,7 @@ module clock_divider
 
                 // Enter idle state after 16 slow-clock edges
                 if (r_slow_cycle == 16)
-                    r_next_state = IDLE;
+                    r_next_state = READY;
 
                 else if (r_fast_cycle == r_cdiv) begin
                     r_next_slow = r_slow_cycle + 1;
@@ -136,7 +140,7 @@ module clock_divider
                     r_rising_edge = 1;
             end
 
-            IDLE: begin
+            READY: begin
                 if (i_config[0])
                     r_next_state = CONFIG;
 
@@ -148,7 +152,7 @@ module clock_divider
     end
 
     // Outputs
-    assign o_idle = (r_state == IDLE);
+    assign o_ready = (r_state == READY);
     assign o_clk = r_clk;
     assign o_clk_n = ~o_clk;
     assign o_slow_count = r_slow_cycle;

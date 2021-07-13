@@ -5,7 +5,7 @@ module clock_divider_tb;
     logic i_rst_n;
     logic [8:0] i_config;
     logic i_start_n;
-    logic o_idle;
+    logic o_ready;
     logic o_clk;
 
     clock_divider DUT(
@@ -13,7 +13,7 @@ module clock_divider_tb;
         .i_rst_n,
         .i_config,
         .i_start_n,
-        .o_idle,
+        .o_ready,
         .o_clk
     );
 
@@ -59,17 +59,17 @@ module clock_divider_tb;
 
     task test_reset;
         $display("Resetting...");
-        @(negedge i_clk)
+        @(posedge i_clk)
             i_rst_n = 0;
 
         // Hold
-        repeat (16) @(negedge i_clk);
+        repeat (16) @(posedge i_clk);
 
-        @(negedge i_clk)
+        repeat (2) @(posedge i_clk)
             i_rst_n = 1;
 
-        @(negedge i_clk) begin
-            assert(o_idle && ~o_clk) else
+        @(posedge i_clk) begin
+            assert(o_ready && ~o_clk) else
                 $fatal(1, "Failed to enter IDLE state after reset");
         end
     endtask
@@ -81,18 +81,18 @@ module clock_divider_tb;
         @(posedge i_clk)
             i_start_n = 0;
 
-        if (o_idle)
-            @(negedge o_idle)
+        if (o_ready)
+            @(negedge o_ready)
                 i_start_n = 1;
 
         repeat((divisor * 8))
             @(posedge i_clk)
-                assert(~o_idle) else
+                assert(~o_ready) else
                     $fatal(1, "Failed to run clock at %f MHz (early exit)", 100.0/divisor);
 
         repeat (5) @(posedge i_clk);
         
-        assert(o_idle && ~o_clk) else
+        assert(o_ready && ~o_clk) else
             $fatal(1, "Failed to run clock at %f MHz (late exit)", 100.0/divisor);
     endtask
 
@@ -104,14 +104,14 @@ module clock_divider_tb;
         @(posedge i_clk)
             i_config = {divisor, 1'h1};
 
-        if (o_idle)
-            @(negedge o_idle);
+        if (o_ready)
+            @(negedge o_ready);
 
-        @(posedge o_idle)
+        @(posedge o_ready)
             i_config = 0;
 
         // Wait until ready
-        if (~o_idle)
-            @(posedge o_idle);
+        if (~o_ready)
+            @(posedge o_ready);
     endtask
 endmodule
