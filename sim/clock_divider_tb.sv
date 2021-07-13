@@ -60,16 +60,16 @@ module clock_divider_tb;
     task test_reset;
         $display("Resetting...");
         @(posedge i_clk)
-            #1.5 i_rst_n = 0;
+            #1 i_rst_n = 0;
 
         // Hold
         repeat (16) @(posedge i_clk);
 
         repeat (5) @(posedge i_clk)
-            #1.5 i_rst_n = 1;
+            #1 i_rst_n = 1;
 
         @(posedge i_clk) begin
-            #1.5 assert(~o_clk) else
+            #0.1 assert(~o_clk) else
                 $fatal(1, "Failed to enter IDLE state after reset");
         end
     endtask
@@ -79,22 +79,20 @@ module clock_divider_tb;
         $display("Running clock at %f MHz", 100.0/divisor);
 
         @(posedge i_clk)
-            #1.5 i_start_n = 0;
+            #1 i_start_n = 0;
 
         if (o_ready)
             @(negedge o_ready)
                 @(posedge i_clk)
-                    #1.5 i_start_n = 1;
+                    #1 i_start_n = 1;
 
-        repeat(divisor * 8)
-            @(posedge i_clk)
-                assert(~o_ready) else
-                    $fatal(1, "Failed to run clock at %f MHz (early exit)", 100.0/divisor);
-
-        repeat (5) @(posedge i_clk);
+        repeat((divisor * 8) - 1) @(posedge i_clk)
+            #2 assert(~o_ready) else
+                $fatal(1, "Failed to run clock at %f MHz (early exit)", 100.0/divisor);
         
-        #1.5 assert(o_ready && ~o_clk) else
-            $fatal(1, "Failed to run clock at %f MHz (late exit)", 100.0/divisor);
+        @(posedge i_clk)
+            #2 assert(o_ready && ~o_clk) else
+                $fatal(1, "Failed to run clock at %f MHz (late exit)", 100.0/divisor);
     endtask
 
     task configure;
@@ -103,10 +101,10 @@ module clock_divider_tb;
         $display("Configuring...");
 
         @(posedge i_clk)
-            #1.5 i_config = {divisor, 1'h1};
+            #1 i_config = {divisor, 1'h1};
             
         @(posedge i_clk)
-            #1.5 i_config = 'h0;
+            #1 i_config = 'h0;
             
     endtask
 endmodule
