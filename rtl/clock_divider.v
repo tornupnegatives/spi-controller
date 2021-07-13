@@ -147,7 +147,7 @@ module clock_divider
             end
 
             READY: begin
-                if (r_config[0])
+                if (i_config[0])
                     r_next_state = CONFIG;
 
                 else if (~i_start_n)
