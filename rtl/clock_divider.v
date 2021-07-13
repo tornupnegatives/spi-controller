@@ -29,13 +29,13 @@ module clock_divider
         input i_start_n,
 
         // Clock output
-        (*dont_touch = "true"*) output reg o_idle,
+        output o_idle,
         output o_clk,
         output o_clk_n,
         
         // Metadata output
-        output reg   o_rising_edge,
-        output reg   o_falling_edge,
+        output       o_rising_edge,
+        output       o_falling_edge,
         output [7:0] o_slow_count
     );
 
@@ -52,6 +52,7 @@ module clock_divider
 
     // CLock divisor
     reg [7:0]  r_cdiv;
+    reg [7:0]  r_next_cdiv;
 
     // Counter
     reg [7:0] r_fast_cycle;
@@ -61,6 +62,8 @@ module clock_divider
 
     // Slow clock
     reg r_clk;
+    reg r_rising_edge;
+    reg r_falling_edge;
 
     // State machine logic
     always @(posedge i_clk) begin
@@ -69,37 +72,20 @@ module clock_divider
             r_state <= RESET;
         end
 
-        // Only accept config/start commands when IDLE
-        else if (r_state == IDLE) begin
-            // Register clock divisor (ensure even)
-            if (i_config[0]) begin
-                if (i_config[8:1] != 0)
-                    r_cdiv <= (i_config[8:1] >> 1) - 1;
-                    
-                // Default slow clock is half speed
-                else 
-                    r_cdiv <= 0;
-                    
-                r_state <= CONFIG;
-            end
-
-            if (~i_start_n) begin
-                r_state <= RUN;
-            end
-        end
-
-        else
+        else begin
+            r_cdiv <= r_next_cdiv;
             r_state <= r_next_state;
+        end
     end
 
     // Counter
     always @(posedge i_clk) begin
-        // Only count when RUNning
+        // Only count when running
         if (r_state == RUN && r_next_state != IDLE) begin
             if (r_fast_cycle != r_cdiv)
                 r_fast_cycle <= r_next_fast;
 
-            // Toggle slow clock when fast clock pulses div times
+            // Toggle slow clock when fast clock pulses cdiv times
             else if (r_fast_cycle == r_cdiv) begin
                 r_fast_cycle <= 0;
                 r_slow_cycle <= r_next_slow;
@@ -116,11 +102,11 @@ module clock_divider
 
     always @(*) begin
         // Defaults
-        o_idle = 1;
-        o_rising_edge = 0;
-        o_falling_edge = 0;
+        r_rising_edge = 0;
+        r_falling_edge = 0;
         r_next_fast = 0;
         r_next_slow = 0;
+        r_next_cdiv = r_cdiv;
         r_next_state = r_state;
 
         case(r_state)
@@ -128,12 +114,11 @@ module clock_divider
                 r_next_state = IDLE;
 
             CONFIG: begin
-                o_idle = 0;
+                r_next_cdiv <= (i_config[8:1] >> 1) - 1;
                 r_next_state = IDLE;
             end
 
             RUN: begin
-                o_idle = 0;
                 r_next_fast = r_fast_cycle + 1;
 
                 // Enter idle state after 16 slow-clock edges
@@ -143,17 +128,30 @@ module clock_divider
                 else if (r_fast_cycle == r_cdiv) begin
                     r_next_slow = r_slow_cycle + 1;
                 end
+
+                // Track edges
+                if (r_clk && r_next_fast == r_cdiv + 1)
+                    r_falling_edge = 1;
+                else if (~r_clk && r_next_fast == r_cdiv + 1)
+                    r_rising_edge = 1;
+            end
+
+            IDLE: begin
+                if (i_config[0])
+                    r_next_state = CONFIG;
+
+                else if (~i_start_n)
+                    r_next_state = RUN;
+
             end
         endcase
-        
-        if (r_clk && r_next_fast == r_cdiv + 1)
-            o_falling_edge = 1;
-        else if (~r_clk && r_next_fast == r_cdiv + 1)
-            o_rising_edge = 1;
-
     end
 
+    // Outputs
+    assign o_idle = (r_state == IDLE);
     assign o_clk = r_clk;
     assign o_clk_n = ~o_clk;
     assign o_slow_count = r_slow_cycle;
+    assign o_rising_edge = r_rising_edge;
+    assign o_falling_edge = r_falling_edge;
 endmodule

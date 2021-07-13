@@ -78,22 +78,19 @@ module clock_divider_tb;
         input [7:0] divisor;
         $display("Running clock at %f MHz", 100.0/divisor);
 
-        // Wait until ready
-        if (~o_idle)
-            @(posedge o_idle);
-
-        @(negedge i_clk)
+        @(posedge i_clk)
             i_start_n = 0;
 
-        @(negedge i_clk)
-            i_start_n = 1;
+        if (o_idle)
+            @(negedge o_idle)
+                i_start_n = 1;
 
         repeat((divisor * 8))
-            @(negedge i_clk)
+            @(posedge i_clk)
                 assert(~o_idle) else
                     $fatal(1, "Failed to run clock at %f MHz (early exit)", 100.0/divisor);
 
-        repeat (5) @(negedge i_clk);
+        repeat (5) @(posedge i_clk);
         
         assert(o_idle && ~o_clk) else
             $fatal(1, "Failed to run clock at %f MHz (late exit)", 100.0/divisor);
@@ -104,10 +101,13 @@ module clock_divider_tb;
 
         $display("Configuring...");
 
-        @(negedge i_clk)
+        @(posedge i_clk)
             i_config = {divisor, 1'h1};
 
-        @(negedge i_clk)
+        if (o_idle)
+            @(negedge o_idle);
+
+        @(posedge o_idle)
             i_config = 0;
 
         // Wait until ready
