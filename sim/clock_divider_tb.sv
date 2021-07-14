@@ -19,6 +19,8 @@ module clock_divider_tb;
 
     // 100 MHz clock
     always #5 i_clk = ~i_clk;
+    real t_in = 2.0;
+    real t_out = 0.0;
 
     // Waveform generation
     initial begin
@@ -60,38 +62,41 @@ module clock_divider_tb;
     task test_reset;
         $display("Resetting...");
         @(posedge i_clk)
-            #1 i_rst_n = 0;
+            #t_in i_rst_n = 0;
 
         // Hold
         repeat (16) @(posedge i_clk);
 
         repeat (5) @(posedge i_clk)
-            #1 i_rst_n = 1;
+            #t_in i_rst_n = 1;
 
         @(posedge i_clk) begin
-            #0.1 assert(~o_clk) else
+            #t_out assert(~o_clk) else
                 $fatal(1, "Failed to enter IDLE state after reset");
         end
     endtask
 
     task test_clock;
         input [7:0] divisor;
+        
         $display("Running clock at %f MHz", 100.0/divisor);
 
         @(posedge i_clk)
-            #1 i_start_n = 0;
+            #t_in i_start_n = 0;
 
         if (o_ready)
             @(negedge o_ready)
                 @(posedge i_clk)
-                    #1 i_start_n = 1;
+                    #t_in i_start_n = 1;
 
         repeat((divisor * 8) - 1) @(posedge i_clk)
-            #2 assert(~o_ready) else
+            #t_out assert(~o_ready) else
                 $fatal(1, "Failed to run clock at %f MHz (early exit)", 100.0/divisor);
         
+        @(posedge i_clk);
+        
         @(posedge i_clk)
-            #2 assert(o_ready && ~o_clk) else
+            #t_out assert(o_ready && ~o_clk) else
                 $fatal(1, "Failed to run clock at %f MHz (late exit)", 100.0/divisor);
     endtask
 
@@ -101,10 +106,10 @@ module clock_divider_tb;
         $display("Configuring...");
 
         @(posedge i_clk)
-            #1 i_config = {divisor, 1'h1};
+            #t_in i_config = {divisor, 1'h1};
             
         @(posedge i_clk)
-            #1 i_config = 'h0;
+            #t_in i_config = 'h0;
             
     endtask
 endmodule
