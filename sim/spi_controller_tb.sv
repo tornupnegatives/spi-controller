@@ -70,13 +70,6 @@ module spi_controller_tb;
         repeat (n_iter)
             send_byte($random, $random);
 
-        /*
-        $display("MODE 2 TESTS");
-        configure(2, 6);
-        repeat (5)
-            send_byte($random);
-        */
-
         reset;
 
         $display("Simulation finish");
@@ -142,8 +135,10 @@ module spi_controller_tb;
 
         // Wait for command to finish
         @(posedge o_rx_valid) begin
-            $display("Received x%x", o_rx);
-            #t_out assert(o_rx === rx) else $fatal(1);
+            @(posedge i_clk) begin
+                $display("Received x%x", o_rx);
+                #t_out assert(o_rx === rx) else $fatal(1);
+            end
         end
     endtask
 endmodule
