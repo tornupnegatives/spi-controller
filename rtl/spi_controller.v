@@ -33,8 +33,8 @@ module spi_controller(
 
         // SPI interface
         input           i_cipo,
-        output reg      o_copi,
-        output reg      o_sclk,
+        output          o_copi,
+        output          o_sclk,
 
         // Status register
         output          o_ready
@@ -61,9 +61,9 @@ module spi_controller(
     reg         r_sclk_start,   r_next_sclk_start;
 
     // Clock divider outputs
-    reg [7:0]   r_sclk_count;
-    reg         r_sclk_rising_edge, r_sclk_falling_edge;
-    reg         r_sclk, r_sclk_n;
+    wire [7:0]   w_sclk_count;
+    wire         w_sclk_rising_edge, w_sclk_falling_edge;
+    wire         w_sclk, w_sclk_n;
 
     // TX/RX
     reg [7:0] r_tx, r_next_tx;
@@ -73,17 +73,17 @@ module spi_controller(
     reg r_copi, r_next_copi;
 
     clock_divider cd(
-        .i_clk,
-        .i_rst_n,
+        .i_clk(i_clk),
+        .i_rst_n(i_rst_n),
         .i_config(r_sclk_config),
         .i_start_n(r_sclk_start),
 
         .o_clk(r_sclk),
         .o_clk_n(r_sclk_n),
 
-        .o_rising_edge(r_sclk_rising_edge),
-        .o_falling_edge(r_sclk_falling_edge),
-        .o_slow_count(r_sclk_count)
+        .o_rising_edge(w_sclk_rising_edge),
+        .o_falling_edge(w_sclk_falling_edge),
+        .o_slow_count(w_sclk_count)
     );
 
     assign w_cphase = (r_spi_mode == 1) || (r_spi_mode == 3);
@@ -152,7 +152,7 @@ module spi_controller(
                 r_next_sclk_start = 'h0;
 
                 // Prepare for end of transmission
-                if (r_sclk_count == 16) begin
+                if (w_sclk_count == 16) begin
                     // Stop clock
                     r_next_sclk_start = 'h1;
 
@@ -167,7 +167,7 @@ module spi_controller(
                 end
 
                 // Always shift data out on rising edge
-                if (r_sclk_rising_edge) begin
+                if (w_sclk_rising_edge) begin
                     r_next_tx = r_tx << 1;
                     r_next_copi = r_tx[7];
 
@@ -177,7 +177,7 @@ module spi_controller(
                 end
 
                 // Sample at falling edge if phase
-                else if (r_sclk_falling_edge && w_cphase)
+                else if (w_sclk_falling_edge && w_cphase)
                     r_next_rx = {r_rx[6:0], i_cipo};
             end
 
