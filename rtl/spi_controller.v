@@ -22,171 +22,184 @@ module spi_controller(
         // │ SPI clock ratio │ SPI mode   │ Store configuration │
         // │ Default: 2      │ Default: 0 │                     │
         // └─────────────────┴────────────┴─────────────────────┘
-        input [10:0] i_config,
+        input [10:0]    i_config,
 
         // Device IO
-        input [7:0] i_tx,
-        input       i_tx_valid,
+        input [7:0]     i_tx,
+        input           i_tx_valid,
 
-        output reg [7:0] o_rx,
-        output reg       o_rx_valid,
+        output [7:0]    o_rx,
+        output          o_rx_valid,
 
         // SPI interface
-        input i_cipo,
-        output reg o_copi,
-        output reg o_sclk,
+        input           i_cipo,
+        output reg      o_copi,
+        output reg      o_sclk,
 
         // Status register
-        output reg o_ready
+        output          o_ready
     );
 
-    // Operational states
-    localparam [2:0]
-        RESET           = 'd0,
-        READY           = 'd1,
-        CONFIG          = 'd2,
-        WAIT_FOR_CLOCK  = 'd3,
-        TXRX            = 'd4,
-        TXRX_FINAL      = 'd5,
-        RX_VALID        = 'd6;
+    // States
+    localparam [4:0]
+        READY           = 5'b00001,
+        RUN             = 5'b00010,
+        FINAL_BIT       = 5'b00100,
+        DATA_VALID      = 5'b01000,
+        CLOCK_CONFIG    = 5'b10000;
 
-    reg [2:0] r_state;
-    reg [2:0] r_next_state;
-
-    // IO storage
-    reg [9:0] r_config;
-    reg [7:0] r_tx;
-    reg [7:0] r_rx;
-    reg       r_copi;
+    reg [7:0] r_state, r_next_state;
 
     // SPI configuration
-    wire [1:0] w_spi_mode;
-    wire [7:0] w_clk_ratio;
-    wire       w_cpol;
-    wire       w_cphase;
+    reg [1:0] r_spi_mode,   r_next_spi_mode;
+    reg [7:0] r_cdiv,       r_next_cdiv;
 
-    // SPI clock generator
-    reg [8:0]  r_clk_config;
-    reg        r_clk_start;
-    wire       w_clk_idle;
-    wire       w_clk;
-    wire       w_clk_n;
-    wire       w_rising_edge;
-    wire       w_falling_edge;
-    wire [7:0] w_clk_count;
+    wire w_cphase, w_cpol;
+
+    // Clock divider inputs
+    reg [8:0]   r_sclk_config,  r_next_sclk_config;
+    reg         r_sclk_start,   r_next_sclk_start;
+
+    // Clock divider outputs
+    reg [7:0]   r_sclk_count;
+    reg         r_sclk_rising_edge, r_sclk_falling_edge;
+    reg         r_sclk, r_sclk_n;
+
+    // TX/RX
+    reg [7:0] r_tx, r_next_tx;
+    reg [7:0] r_rx, r_next_rx;
+
+    // SPI
+    reg r_copi, r_next_copi;
 
     clock_divider cd(
-        .i_clk(i_clk),
-        .i_rst_n(i_rst_n),
-        .i_config(r_clk_config),
-        .i_start_n(r_clk_start),
-        .o_idle(w_clk_idle),
-        .o_clk(w_clk),
-        .o_clk_n(w_clk_n),
-        .o_rising_edge(w_rising_edge),
-        .o_falling_edge(w_falling_edge),
-        .o_slow_count(w_clk_count)
+        .i_clk,
+        .i_rst_n,
+        .i_config(r_sclk_config),
+        .i_start_n(r_sclk_start),
+
+        .o_clk(r_sclk),
+        .o_clk_n(r_sclk_n),
+
+        .o_rising_edge(r_sclk_rising_edge),
+        .o_falling_edge(r_sclk_falling_edge),
+        .o_slow_count(r_sclk_count)
     );
-    
-    // Assignments
-    assign w_spi_mode  = r_config[1:0];
-    assign w_clk_ratio = r_config[9:2];
-    assign w_cpol = (w_spi_mode == 2) || (w_spi_mode == 3);
-    assign w_cphase = (w_spi_mode == 1) || (w_spi_mode == 3);
+
+    assign w_cphase = (r_spi_mode == 1) || (r_spi_mode == 3);
+    assign w_cpol   = (r_spi_mode == 2) || (r_spi_mode == 3);
 
     always @(posedge i_clk) begin
         if (~i_rst_n) begin
-            r_config <= 10'b00000010_00;
-            r_tx <= 0;
-            r_rx <= 0;
-            r_copi <= 0;
-            r_state <= RESET;
-        end
-
-        else if (r_state == READY || r_state == RX_VALID) begin
-            if (i_config[0]) begin
-                r_config <= i_config[10:1];
-                r_state <= CONFIG;
-            end
-
-            else if (i_tx_valid) begin
-                r_rx <= 0;
-                r_tx <= i_tx;
-                r_state <= TXRX;
-            end
-        end
-
-        else if (r_state == TXRX) begin
-            if ((w_cphase && w_rising_edge) || (~w_cphase && w_falling_edge)) begin
-                r_copi <= r_tx[7];
-                r_tx <= r_tx << 1;
-            end
-
-            else if ((~w_cphase && w_rising_edge) || (w_cphase && w_falling_edge))
-                r_rx <= {r_rx[6:0], i_cipo};
-
-            r_state <= r_next_state;
-        end
-
-        else if (r_state == TXRX_FINAL) begin
-            r_rx <= {r_rx[6:0], i_cipo};
-            r_state <= r_next_state;
+            r_state         <= READY;
+            r_spi_mode      <= 'h0;
+            r_cdiv          <= 'h2;
+            r_sclk_config   <= 'h0;
+            r_sclk_start    <= 'h1;
+            r_tx            <= 'h0;
+            r_rx            <= 'h0;
+            r_copi          <= 'h0;
         end
 
         else begin
-            r_copi <= 0;
-            r_state <= r_next_state;
+            r_state         <= r_next_state;
+            r_spi_mode      <= r_next_spi_mode;
+            r_cdiv          <= r_next_cdiv;
+            r_sclk_config   <= r_next_sclk_config;
+            r_sclk_start    <= r_next_sclk_start;
+            r_tx            <= r_next_tx;
+            r_rx            <= r_next_rx;
+            r_copi          <= r_next_copi;
         end
     end
 
     always @(*) begin
-        // Default register values
-        r_clk_config = 0;
-        r_clk_start = 1;
-        r_next_state = r_state;
+        // Defaults
+        r_next_state        = r_state;
+        r_next_spi_mode     = r_spi_mode;
+        r_next_cdiv         = r_cdiv;
+        r_next_sclk_config  = r_sclk_config;
+        r_next_sclk_start   = r_sclk_start;
+        r_next_tx           = r_tx;
+        r_next_rx           = r_rx;
+        r_next_copi         = r_copi;
 
-        // Update internal registers
         case (r_state)
-            RESET: begin
-                r_clk_start = 1;
-                r_next_state = WAIT_FOR_CLOCK;
-            end
+            READY: begin
+                if (i_config[0]) begin
+                    r_next_spi_mode = i_config[2:1];
+                    r_next_cdiv = i_config[10:3];
+                    r_next_sclk_config = {r_next_cdiv, 1'h1};
 
-            CONFIG: begin
-                r_clk_config = {w_clk_ratio, 1'd1};
+                    r_next_state = CLOCK_CONFIG;
+                end
 
-                // Wait for clock to enter CONFIG state
-                if (w_clk_idle)
-                    r_next_state = CONFIG;
+                else if (i_tx_valid) begin
+                    r_next_tx = i_tx;
+                    r_next_rx = 'h0;
 
-                // Wait for clock to exit CONFIG state
-                else if (~w_clk_idle)
-                    r_next_state = WAIT_FOR_CLOCK;
-            end
-
-            WAIT_FOR_CLOCK: begin
-                // Disable clock when it enters IDLE state
-                if (w_clk_idle)
-                    r_next_state = READY;
-            end
-
-            TXRX: begin
-                r_clk_start = 0;
-
-                if (w_clk_count == 15) begin
-                    r_clk_start = 1;
-                    r_next_state = TXRX_FINAL;
+                    r_next_state = RUN;
                 end
             end
 
-            TXRX_FINAL: r_next_state = RX_VALID;
-        endcase
+            CLOCK_CONFIG: begin
+                r_next_sclk_config = 'h0;
+                r_next_state = READY;
+            end
 
-        // Set outputs
-        o_ready     = (r_state == READY) || (r_state == RX_VALID);
-        o_rx_valid  = (r_state == RX_VALID);
-        o_rx        = r_rx;
-        o_sclk      = w_cpol ? w_clk_n : w_clk;
-        o_copi      = r_copi;
+            RUN: begin
+                // Start clock
+                r_next_sclk_start = 'h0;
+
+                // Prepare for end of transmission
+                if (r_sclk_count == 16) begin
+                    // Stop clock
+                    r_next_sclk_start = 'h1;
+
+                    // If there is a phase, read the last
+                    if (~w_cphase)
+                        r_next_rx = {r_rx[6:0], i_cipo};
+
+                    // Disable output
+                    r_next_copi = 'h0;
+
+                    r_next_state = FINAL_BIT;
+                end
+
+                // Always shift data out on rising edge
+                if (r_sclk_rising_edge) begin
+                    r_next_tx = r_tx << 1;
+                    r_next_copi = r_tx[7];
+
+                    // Sample if no phase
+                    if (~w_cphase)
+                        r_next_rx = {r_rx[6:0], i_cipo};
+                end
+
+                // Sample at falling edge if phase
+                else if (r_sclk_falling_edge && w_cphase)
+                    r_next_rx = {r_rx[6:0], i_cipo};
+            end
+
+            FINAL_BIT: begin
+                // If there is a phase and polarity, sample one more time
+                if (r_spi_mode == 3)
+                    r_next_rx = {r_rx[6:0], i_cipo};
+
+                r_next_state = DATA_VALID;
+            end
+
+            // Hold data valid signal for one clock cycle
+            DATA_VALID: begin
+                r_next_state = READY;
+            end
+        endcase
     end
+
+    // Outputs
+    assign o_ready = (r_state == READY);
+    assign o_rx = r_rx;
+    assign o_rx_valid = (r_state == DATA_VALID);
+    assign o_copi = r_copi;
+    assign o_sclk = (w_cpol) ? r_sclk_n : r_sclk;
 endmodule
