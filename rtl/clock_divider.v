@@ -117,8 +117,8 @@ module clock_divider
                         r_next_slow     = r_slow_cycle + 'h1;
                         r_next_clk      = ~r_clk;
                         
-                        r_rising_edge   = r_clk;
-                        r_falling_edge  = ~r_clk;
+                        r_rising_edge   = ~r_clk;
+                        r_falling_edge  = r_clk;
                        
                     end
                     
