@@ -48,7 +48,7 @@ module spi_controller(
         DATA_VALID      = 5'b01000,
         CLOCK_CONFIG    = 5'b10000;
 
-    reg [7:0] r_state, r_next_state;
+    reg [4:0] r_state, r_next_state;
 
     // SPI configuration
     reg [1:0] r_spi_mode,   r_next_spi_mode;
@@ -78,8 +78,8 @@ module spi_controller(
         .i_config(r_sclk_config),
         .i_start_n(r_sclk_start),
 
-        .o_clk(r_sclk),
-        .o_clk_n(r_sclk_n),
+        .o_clk(w_sclk),
+        .o_clk_n(w_sclk_n),
 
         .o_rising_edge(w_sclk_rising_edge),
         .o_falling_edge(w_sclk_falling_edge),
@@ -201,5 +201,5 @@ module spi_controller(
     assign o_rx = r_rx;
     assign o_rx_valid = (r_state == DATA_VALID);
     assign o_copi = r_copi;
-    assign o_sclk = (w_cpol) ? r_sclk_n : r_sclk;
+    assign o_sclk = (w_cpol) ? w_sclk_n : w_sclk;
 endmodule
