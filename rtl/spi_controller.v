@@ -5,9 +5,6 @@
 // Target Devices:  Xilinx Artix-7
 // Description:     Configurable SPI controller
 // Author:          Joseph Bellahcen <tornupnegatives@gmail.com>
-//
-// Notes:           Currently supports SPI MODE: 0, 1
-//                  Current max clock ratio: 8
 ///////////////////////////////////////////////////////////////////////////////
 
 module spi_controller(
@@ -197,7 +194,7 @@ module spi_controller(
     end
 
     // Outputs
-    assign o_ready = (r_state == READY);
+    assign o_ready = (r_state == READY) && i_rst_n;
     assign o_rx = r_rx;
     assign o_rx_valid = (r_state == DATA_VALID);
     assign o_copi = r_copi;
