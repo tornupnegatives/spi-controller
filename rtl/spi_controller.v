@@ -69,6 +69,8 @@ module spi_controller(
     // SPI
     reg r_copi, r_next_copi;
 
+    reg r_ready, r_next_ready;
+
     clock_divider cd(
         .i_clk(i_clk),
         .i_rst_n(i_rst_n),
@@ -96,6 +98,7 @@ module spi_controller(
             r_tx            <= 'h0;
             r_rx            <= 'h0;
             r_copi          <= 'h0;
+            r_ready         <= 'h0;
         end
 
         else begin
@@ -107,6 +110,7 @@ module spi_controller(
             r_tx            <= r_next_tx;
             r_rx            <= r_next_rx;
             r_copi          <= r_next_copi;
+            r_ready         <= r_next_ready;
         end
     end
 
@@ -120,9 +124,12 @@ module spi_controller(
         r_next_tx           = r_tx;
         r_next_rx           = r_rx;
         r_next_copi         = r_copi;
+        r_next_ready        = r_ready;
 
         case (r_state)
             READY: begin
+                r_next_ready = i_rst_n;
+
                 if (i_config[0]) begin
                     r_next_spi_mode = i_config[2:1];
                     r_next_cdiv = i_config[10:3];
@@ -147,6 +154,7 @@ module spi_controller(
             RUN: begin
                 // Start clock
                 r_next_sclk_start = 'h0;
+                r_next_ready = 'h0;
 
                 // Prepare for end of transmission
                 if (w_sclk_count == 16) begin
@@ -188,13 +196,14 @@ module spi_controller(
 
             // Hold data valid signal for one clock cycle
             DATA_VALID: begin
+                r_next_ready = 'h1;
                 r_next_state = READY;
             end
         endcase
     end
 
     // Outputs
-    assign o_ready = (r_state == READY) && i_rst_n;
+    assign o_ready = r_ready;
     assign o_rx = r_rx;
     assign o_rx_valid = (r_state == DATA_VALID);
     assign o_copi = r_copi;
