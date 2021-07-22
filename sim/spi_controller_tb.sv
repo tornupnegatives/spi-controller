@@ -84,7 +84,7 @@ module spi_controller_tb;
 
         #105
 
-        repeat (2) @(posedge i_clk)
+        repeat (3) @(posedge i_clk)
             #t_in i_rst_n = 1;
 
         @(posedge i_clk) begin

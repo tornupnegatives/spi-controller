@@ -57,7 +57,8 @@ module clock_divider
 
     // Slow clock
     reg r_clk, r_next_clk;
-    reg r_rising_edge, r_falling_edge;
+    reg r_rising_edge,  r_next_rising_edge;
+    reg r_falling_edge, r_next_falling_edge;
 
     // State machine logic
     always @(posedge i_clk) begin
@@ -67,6 +68,8 @@ module clock_divider
             r_fast_cycle    <= 'h0;
             r_slow_cycle    <= 'h0;
             r_clk           <= 'h0;
+            r_rising_edge   <= 'h0;
+            r_falling_edge  <= 'h0;
         end
 
         else begin
@@ -75,19 +78,20 @@ module clock_divider
             r_fast_cycle    <= r_next_fast;
             r_slow_cycle    <= r_next_slow;
             r_clk           <= r_next_clk;
+            r_rising_edge   <= r_next_rising_edge;
+            r_falling_edge  <= r_next_falling_edge;
         end
     end
 
     always @(*) begin
         // Defaults
-        r_next_state    = r_state;
-        r_next_cdiv     = r_cdiv;
-        r_next_fast     = r_fast_cycle;
-        r_next_slow     = r_slow_cycle;
-        r_next_clk      = r_clk;
-        
-        r_rising_edge   = 'h0;
-        r_falling_edge  = 'h0;
+        r_next_state        = r_state;
+        r_next_cdiv         = r_cdiv;
+        r_next_fast         = r_fast_cycle;
+        r_next_slow         = r_slow_cycle;
+        r_next_clk          = r_clk;
+        r_next_rising_edge  = r_rising_edge;
+        r_next_falling_edge = r_falling_edge;
 
         case(r_state)
             READY: begin
@@ -103,9 +107,11 @@ module clock_divider
             RUN: begin
                 // Stop clocking after 8 slow clocks
                 if (r_slow_cycle == 16) begin
-                    r_next_fast = 'h0;
-                    r_next_slow = 'h0;
-                    r_next_clk = 'h0;
+                    r_next_fast         = 'h0;
+                    r_next_slow         = 'h0;
+                    r_next_clk          = 'h0;
+                    r_next_rising_edge  = 'h0;
+                    r_next_falling_edge = 'h0;
                     
                     r_next_state = READY;
                 end
@@ -116,13 +122,11 @@ module clock_divider
                         r_next_fast     = 'h0;
                         r_next_slow     = r_slow_cycle + 'h1;
                         r_next_clk      = ~r_clk;
-                        
-                        r_rising_edge   = ~r_clk;
-                        r_falling_edge  = r_clk;
-                       
                     end
                     
                     else begin
+                        r_next_rising_edge  = (r_fast_cycle == r_cdiv / 2 - 1) ? ~r_clk : 'h0;
+                        r_next_falling_edge = (r_fast_cycle == r_cdiv / 2 - 1) ? r_clk  : 'h0;
                         r_next_fast = r_fast_cycle + 'h1;
                     end
                 end
