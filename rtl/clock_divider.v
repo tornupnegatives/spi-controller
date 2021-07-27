@@ -59,17 +59,19 @@ module clock_divider
     reg r_clk, r_next_clk;
     reg r_rising_edge,  r_next_rising_edge;
     reg r_falling_edge, r_next_falling_edge;
+    reg r_ready,        r_next_ready;
 
     // State machine logic
     always @(posedge i_clk) begin
         if (~i_rst_n) begin
             r_state         <= READY;
-            r_cdiv          <= 'h0;
+            r_cdiv          <= 'h2;
             r_fast_cycle    <= 'h0;
             r_slow_cycle    <= 'h0;
             r_clk           <= 'h0;
             r_rising_edge   <= 'h0;
             r_falling_edge  <= 'h0;
+            r_ready         <= 'h0;
         end
 
         else begin
@@ -80,6 +82,7 @@ module clock_divider
             r_clk           <= r_next_clk;
             r_rising_edge   <= r_next_rising_edge;
             r_falling_edge  <= r_next_falling_edge;
+            r_ready         <= r_next_ready;
         end
     end
 
@@ -95,14 +98,20 @@ module clock_divider
 
         case(r_state)
             READY: begin
-                if (i_config[0]) begin
-                    r_next_cdiv  = (i_config[8:1] >> 1) - 'h1;
-                    r_next_state = READY;
-                end
+                r_next_ready = i_rst_n;
                 
-                else if (~i_start_n)
-                    r_next_state = RUN;
-             end       
+                if (i_rst_n) begin
+                    if (i_config[0]) begin
+                        r_next_cdiv  = i_config[8:1];
+                        r_next_state = READY;
+                    end
+                
+                    else if (~i_start_n) begin
+                        r_next_ready = 'h0;
+                        r_next_state = RUN;
+                    end
+                end
+             end
 
             RUN: begin
                 // Stop clocking after 8 slow clocks
@@ -118,24 +127,26 @@ module clock_divider
                     
                 // Toggle slow clock when fast clock hits divisor
                 else begin
-                    if (r_fast_cycle == r_cdiv) begin
+                    if (r_fast_cycle == r_cdiv / 2 - 1) begin
                         r_next_fast     = 'h0;
                         r_next_slow     = r_slow_cycle + 'h1;
                         r_next_clk      = ~r_clk;
                     end
                     
                     else begin
-                        r_next_rising_edge  = (r_fast_cycle == r_cdiv / 2 - 1) ? ~r_clk : 'h0;
-                        r_next_falling_edge = (r_fast_cycle == r_cdiv / 2 - 1) ? r_clk  : 'h0;
                         r_next_fast = r_fast_cycle + 'h1;
                     end
                 end
+                
+                // Update edge detectors every clock cycle
+                r_next_rising_edge  = (r_fast_cycle == r_cdiv / 2 - 1) ? r_clk   : 'h0;
+                r_next_falling_edge = (r_fast_cycle == r_cdiv / 2 - 1) ? ~r_clk  : 'h0;
             end
         endcase
     end
 
     // Outputs
-    assign o_ready = (r_state == READY);
+    assign o_ready = r_ready;
     assign o_clk = r_clk;
     assign o_clk_n = ~o_clk;
     assign o_slow_count = r_slow_cycle;
