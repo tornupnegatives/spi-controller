@@ -73,7 +73,7 @@ module spi_controller(
     reg r_ready, r_next_ready;
     reg r_rx_valid, r_next_rx_valid;
 
-    clock_divider cd(
+    clock_divider CD(
         .i_clk(i_clk),
         .i_rst_n(i_rst_n),
         .i_config(r_sclk_config),

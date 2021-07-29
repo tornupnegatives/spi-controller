@@ -33,7 +33,7 @@ module spi_controller_top
     reg [1:0] r_tx_valid_sync;
     reg [1:0] r_cipo_sync;
     
-    spi_controller SC0(
+    spi_controller SC(
     	.i_clk(i_clk),
     	.i_rst_n(i_rst_n),
     	.i_config({i_config[10:1], r_config_sync[1]}),   
