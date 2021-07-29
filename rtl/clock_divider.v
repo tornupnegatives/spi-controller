@@ -40,13 +40,12 @@ module clock_divider
     );
 
     // Operational states
-    localparam [2:0]
-        RESET  = 3'b001,
-        READY  = 3'b010,
-        RUN    = 3'b100;
+    localparam [1:0]
+        READY  = 2'b01,
+        RUN    = 2'b10;
 
     // State machine
-    reg [2:0] r_state, r_next_state;
+    reg [1:0] r_state, r_next_state;
 
     // Clock divisor
     reg [7:0]  r_cdiv, r_next_cdiv;
@@ -109,6 +108,11 @@ module clock_divider
                     else if (~i_start_n) begin
                         r_next_ready = 'h0;
                         r_next_state = RUN;
+
+                        // For a half-speed clock, the next clock cycle will
+                        // be the rising edge. Report it now!
+                        if (r_cdiv == 2)
+                            r_next_rising_edge = 'h1;
                     end
                 end
              end
@@ -119,9 +123,6 @@ module clock_divider
                     r_next_fast         = 'h0;
                     r_next_slow         = 'h0;
                     r_next_clk          = 'h0;
-                    r_next_rising_edge  = 'h0;
-                    r_next_falling_edge = 'h0;
-                    
                     r_next_state = READY;
                 end
                     
@@ -139,8 +140,16 @@ module clock_divider
                 end
                 
                 // Update edge detectors every clock cycle
-                r_next_rising_edge  = (r_fast_cycle == r_cdiv / 2 - 1) ? r_clk   : 'h0;
-                r_next_falling_edge = (r_fast_cycle == r_cdiv / 2 - 1) ? ~r_clk  : 'h0;
+                if (r_cdiv > 2) begin
+                    r_next_rising_edge  = (r_fast_cycle == r_cdiv / 2 - 2) && r_slow_cycle != 16 ? ~r_clk   : 'h0;
+                    r_next_falling_edge = (r_fast_cycle == r_cdiv / 2 - 2) && r_slow_cycle != 16 ? r_clk    : 'h0;
+                end
+
+                // For a half-speed clock, update edges early
+                else begin
+                    r_next_rising_edge  = (r_fast_cycle == r_cdiv / 2 - 1) && r_slow_cycle < 15 ? r_clk     : 'h0;
+                    r_next_falling_edge = (r_fast_cycle == r_cdiv / 2 - 1) && r_slow_cycle < 16 ? ~r_clk    : 'h0;
+                end
             end
         endcase
     end

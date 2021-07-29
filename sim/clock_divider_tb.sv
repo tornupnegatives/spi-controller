@@ -89,7 +89,7 @@ module clock_divider_tb;
                 @(posedge i_clk)
                     #t_in i_start_n = 1;
 
-        repeat((divisor * 8) - 1) @(posedge i_clk)
+        repeat((divisor * 8)) @(posedge i_clk)
             #t_out assert(~o_ready) else
                 $fatal(1, "Failed to run clock at %f MHz (early exit)", 100.0/divisor);
         
