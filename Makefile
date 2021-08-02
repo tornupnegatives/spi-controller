@@ -20,7 +20,7 @@ test-edge-detector:
 	rm -f test_edge_detector
 
 test-spi-controller:
-	$(COMPILER) $(CFLAGS) -o test_spi_controller sim/spi_controller_tb.sv rtl/clock_divider.v rtl/spi_controller.v 
+	$(COMPILER) $(CFLAGS) -o test_spi_controller rtl/clock_divider.v rtl/spi_controller.v rtl/sync.v rtl/spi_controller_top.v sim/spi_controller_tb.sv 
 	$(SIM) ./test_spi_controller
 	rm -f test_spi_controller
 	
