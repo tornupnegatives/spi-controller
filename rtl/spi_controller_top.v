@@ -28,6 +28,7 @@ module spi_controller_top(
         input   i_cipo,
         output  o_copi,
         output  o_sclk,
+        output  o_cs_n,
 
         // Status registers
         output o_ready,
@@ -50,6 +51,7 @@ module spi_controller_top(
     wire w_request_tx_sync;
     wire w_ws_n_sync, w_rs_n_sync;
     wire w_cipo_sync;
+    wire w_cipo;
     sync S0(.i_clk(i_clk), .i_rst_n(i_rst_n), .i_sig(i_request_tx), .o_stable(w_request_tx_sync));
     sync S1(.i_clk(i_clk), .i_rst_n(i_rst_n), .i_sig(i_ws_n),       .o_stable(w_ws_n_sync));
     sync S2(.i_clk(i_clk), .i_rst_n(i_rst_n), .i_sig(i_rs_n),       .o_stable(w_rs_n_sync));
@@ -63,7 +65,7 @@ module spi_controller_top(
     	.i_tx_valid(i_request_tx),
     	.o_rx(w_spi_rx),
     	.o_rx_valid(o_rx_valid),
-    	.i_cipo(w_cipo_sync),
+    	.i_cipo(w_cipo),
     	.o_copi(o_copi),
     	.o_sclk(o_sclk),
     	.o_ready(o_ready)
@@ -159,10 +161,14 @@ module spi_controller_top(
             end
         endcase
     end
+    
+    // For a half-speed clock, there is not enough time to sync inputs
+    assign w_cipo = (r_clk_div == 'h2) ? i_cipo : w_cipo_sync;
 
     // Debug registers
     assign w_whoami = 8'hA7;
 
     // Outputs
     assign o_data = r_data;
+    assign o_cs_n = o_ready;
 endmodule
