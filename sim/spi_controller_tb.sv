@@ -20,7 +20,7 @@ module spi_controller_tb;
     real t_in = 2.0;
     real t_out = 0.0;
 
-    integer n_iter = 255;
+    integer n_iter = 10;
 
     spi_controller_top DUT(.*);
 
@@ -43,17 +43,17 @@ module spi_controller_tb;
         reset;
 
         $display("MODE 0 TESTS");
-        configure(0, 4);
+        configure(0, 2);
         repeat (n_iter)
             send_byte($random, $random);
 
         $display("MODE 1 TESTS");
-        configure(1, 8);
+        configure(1, 4);
         repeat (n_iter)
             send_byte($random, $random);
 
         $display("MODE 2 TESTS");
-        configure(2, 12);
+        configure(2, 8);
         repeat (n_iter)
             send_byte($random, $random);
 
