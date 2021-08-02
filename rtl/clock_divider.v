@@ -94,6 +94,7 @@ module clock_divider
         r_next_clk          = r_clk;
         r_next_rising_edge  = r_rising_edge;
         r_next_falling_edge = r_falling_edge;
+        r_next_ready        = r_ready;
 
         case(r_state)
             READY: begin
