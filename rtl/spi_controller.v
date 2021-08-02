@@ -147,7 +147,8 @@ module spi_controller(
                     r_next_tx = i_tx;
                     r_next_rx = 'h0;
                     r_next_rx_valid = 'h0;
-
+                    r_next_ready = 'h0;
+                    
                     r_next_state = RUN;
                 end
             end
@@ -160,7 +161,6 @@ module spi_controller(
             RUN: begin
                 // Start clock
                 r_next_sclk_start = 'h0;
-                r_next_ready = 'h0;
 
                 // Prepare for end of transmission
                 if (w_sclk_count == 16) begin
