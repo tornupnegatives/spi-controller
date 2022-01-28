@@ -28,7 +28,6 @@ module spi_controller_top(
         input   i_cipo,
         output  o_copi,
         output  o_sclk,
-        output  o_cs_n,
 
         // Status registers
         output o_ready,
@@ -170,5 +169,4 @@ module spi_controller_top(
 
     // Outputs
     assign o_data = r_data;
-    assign o_cs_n = o_ready;
 endmodule
