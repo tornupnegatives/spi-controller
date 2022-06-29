@@ -158,7 +158,7 @@ module clock_divider
     // Outputs
     assign o_ready = r_ready;
     assign o_clk = r_clk;
-    assign o_clk_n = ~o_clk;
+    assign o_clk_n = ~r_clk;
     assign o_slow_count = r_slow_cycle;
     assign o_rising_edge = r_rising_edge;
     assign o_falling_edge = r_falling_edge;
